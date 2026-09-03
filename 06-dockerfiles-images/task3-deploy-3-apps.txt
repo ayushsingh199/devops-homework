@@ -1,0 +1,21 @@
+===== Task 3: Deploy 3 different application types with Docker =====
+
+$ docker run -d --name deploy-nodejs -p 8091:3000 nodejs-hello
+2760f936794de12e4358f957716ebb7604f357efd757e3295ba9dc25d5f1a358
+$ docker run -d --name deploy-python -p 8092:5000 python-hello
+be6c3f1eaee634133d74f15748c12ff689988cd43b88c1172b419c42b81ec760
+$ docker run -d --name deploy-java -p 8093:8000 java-hello
+2c9ed1d98758d71ca4488a17d0a4ea7cba2127131ac063033742afe1c3dbe419
+
+$ curl -s http://localhost:8091   # Node.js
+<h1>Hello World from Node.js</h1>
+$ curl -s http://localhost:8092   # Python
+<h1>Hello World from Python</h1>
+$ curl -s http://localhost:8093   # Java
+<h1>Hello World from Java</h1>
+
+$ docker ps --filter name=deploy-
+CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS                                         NAMES
+2c9ed1d98758   java-hello     "/__cacert_entrypoin…"   4 seconds ago   Up 3 seconds   0.0.0.0:8093->8000/tcp, [::]:8093->8000/tcp   deploy-java
+be6c3f1eaee6   python-hello   "python app.py"          4 seconds ago   Up 4 seconds   0.0.0.0:8092->5000/tcp, [::]:8092->5000/tcp   deploy-python
+2760f936794d   nodejs-hello   "docker-entrypoint.s…"   5 seconds ago   Up 4 seconds   0.0.0.0:8091->3000/tcp, [::]:8091->3000/tcp   deploy-nodejs
