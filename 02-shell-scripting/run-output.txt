@@ -1,0 +1,39 @@
+$ chmod +x system_info.sh
+$ ./system_info.sh
+===== System Information Script =====
+
+Date        : Thu Sep  3 15:55:52 IST 2026
+Hostname    : Ayushs-MacBook-Air-2.local
+Username    : ayushsingh
+
+----- Disk Usage (/) -----
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s1s1   228Gi    12Gi   4.3Gi    75%    404k   45M    1%   /
+
+----- Running Processes (top 10, COMMAND truncated for display) -----
+USER               PID  %CPU %MEM      VSZ    RSS   TT  STAT STARTED      TIME COMMAND
+_windowserver      156  35.1  0.5 414131488  40944   ??  Ss   23Aug26 599:24.19 /System/Library/Priv
+ayushsingh       72233  20.6  3.0 1934147392 253568   ??  S    Thu07PM 122:56.34 /Applications/Claud
+ayushsingh       72138  17.2  0.6 461296976  46688   ??  S    Thu07PM  10:19.65 /Applications/Claude
+ayushsingh       67463   5.4  0.5 1932287024  41280   ??  S    27Aug26 111:02.24 /Applications/Googl
+root               242   2.9  0.2 410488144  17424   ??  Ss   23Aug26   7:37.98 /usr/libexec/syspoli
+ayushsingh        5593   2.7  0.4 1928329648  33888   ??  S    Mon12PM  26:17.75 /Applications/Googl
+ayushsingh       20634   2.4  1.0 1924227024  83888   ??  S     9:56PM   1:57.61 /Applications/Googl
+ayushsingh       25341   2.4  0.2 418133664  20496   ??  S     2:56PM   1:36.68 /Applications/Adobe 
+ayushsingh       72622   2.0  1.5 416661024 125552   ??  S    Thu07PM  46:07.96 /Users/ayushsingh/Li
+
+Created directory: proc-report
+Created file: proc-report/running-processes.txt
+
+Full running-process list saved to: proc-report/running-processes.txt
+===== Done =====
+
+$ cat proc-report/running-processes.txt | head -5   # confirm the file got the FULL ps aux output
+USER               PID  %CPU %MEM      VSZ    RSS   TT  STAT STARTED      TIME COMMAND
+_windowserver      156  35.1  0.5 414131488  40944   ??  Rs   23Aug26 599:24.21 /System/Library/Priv
+ayushsingh       72233  19.6  2.9 1934147392 244496   ??  S    Thu07PM 122:56.35 /Applications/Claud
+ayushsingh       72138  15.5  0.5 461296976  45280   ??  S    Thu07PM  10:19.66 /Applications/Claude
+ayushsingh       20634   8.4  1.0 1924227024  83888   ??  S     9:56PM   1:57.61 /Applications/Googl
+
+$ wc -l proc-report/running-processes.txt
+     538 proc-report/running-processes.txt
