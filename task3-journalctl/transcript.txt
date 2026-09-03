@@ -1,0 +1,102 @@
++ echo '===== journalctl: last 20 lines, whole system ====='
+===== journalctl: last 20 lines, whole system =====
++ colima ssh -- journalctl --no-pager -n 20
+Sep 03 15:41:56 colima kernel: docker0: port 1(vethbce2a21) entered disabled state
+Sep 03 15:41:56 colima kernel: veth91e99be: renamed from eth0
+Sep 03 15:41:56 colima systemd-networkd[395]: vethbce2a21: Lost carrier
+Sep 03 15:41:56 colima systemd-networkd[395]: vethbce2a21: Link DOWN
+Sep 03 15:41:56 colima kernel: docker0: port 1(vethbce2a21) entered disabled state
+Sep 03 15:41:56 colima kernel: vethbce2a21 (unregistering): left allmulticast mode
+Sep 03 15:41:56 colima kernel: vethbce2a21 (unregistering): left promiscuous mode
+Sep 03 15:41:56 colima kernel: docker0: port 1(vethbce2a21) entered disabled state
+Sep 03 15:41:56 colima systemd[1]: run-docker-netns-c2ac2982cb5e.mount: Deactivated successfully.
+Sep 03 15:41:56 colima systemd[1]: mnt-lima\x2dcolima-docker-rootfs-overlayfs-e2b5d2d61c2079199a9453e81330f27e845b0d9021c56782c33a385fe2d9a036.mount: Deactivated successfully.
+Sep 03 15:41:56 colima systemd[1]: var-lib-docker-rootfs-overlayfs-e2b5d2d61c2079199a9453e81330f27e845b0d9021c56782c33a385fe2d9a036.mount: Deactivated successfully.
+Sep 03 15:41:57 colima systemd-networkd[395]: docker0: Lost carrier
+Sep 03 15:42:21 colima lima-guestagent[1143]: time="2026-09-03T15:42:21+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 101.893974ms)"
+Sep 03 15:43:51 colima lima-guestagent[1143]: time="2026-09-03T15:43:51+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 102.844771ms)"
+Sep 03 15:44:11 colima lima-guestagent[1143]: time="2026-09-03T15:44:11+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 118.726424ms)"
+Sep 03 15:44:31 colima lima-guestagent[1143]: time="2026-09-03T15:44:31+05:30" level=info msg="SyncTime: system time synchronized with host (drift was -122.735771ms)"
+Sep 03 15:45:11 colima lima-guestagent[1143]: time="2026-09-03T15:45:11+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 169.140653ms)"
+Sep 03 15:46:01 colima lima-guestagent[1143]: time="2026-09-03T15:46:01+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 105.166379ms)"
+Sep 03 15:46:31 colima lima-guestagent[1143]: time="2026-09-03T15:46:31+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 101.907806ms)"
+Sep 03 15:46:51 colima lima-guestagent[1143]: time="2026-09-03T15:46:51+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 108.572323ms)"
++ echo
+
++ echo '===== journalctl -u ssh (or sshd) - service-specific ====='
+===== journalctl -u ssh (or sshd) - service-specific =====
++ colima ssh -- bash -c 'journalctl -u ssh --no-pager -n 15 2>/dev/null || journalctl -u sshd --no-pager -n 15 2>/dev/null || echo "ssh service not present in this minimal VM"'
+Sep 03 15:36:12 lima-colima sshd[584]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
+Sep 03 15:36:12 lima-colima sshd[584]: pam_unix(sshd:session): session closed for user ayushsingh
+Sep 03 15:36:12 lima-colima sshd[772]: Accepted publickey for ayushsingh from 192.168.5.2 port 24774 ssh2: ED25519 SHA256:byz4/YMM7JxoIN5y6lBeWwSZTuUjPeMlq0Js+pxGp0I
+Sep 03 15:36:12 lima-colima sshd[772]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
+Sep 03 15:36:12 lima-colima sshd[772]: pam_unix(sshd:session): session closed for user ayushsingh
+Sep 03 15:36:13 lima-colima systemd[1]: Reloading ssh.service - OpenBSD Secure Shell server...
+Sep 03 15:36:13 lima-colima sshd[564]: Received SIGHUP; restarting.
+Sep 03 15:36:13 lima-colima sshd[564]: Server listening on 0.0.0.0 port 22.
+Sep 03 15:36:13 lima-colima sshd[564]: Server listening on :: port 22.
+Sep 03 15:36:13 lima-colima systemd[1]: Reloaded ssh.service - OpenBSD Secure Shell server.
+Sep 03 15:36:15 lima-colima sshd[1218]: Accepted publickey for ayushsingh from 192.168.5.2 port 51675 ssh2: ED25519 SHA256:byz4/YMM7JxoIN5y6lBeWwSZTuUjPeMlq0Js+pxGp0I
+Sep 03 15:36:15 lima-colima sshd[1218]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
+Sep 03 15:36:16 lima-colima sshd[1218]: pam_unix(sshd:session): session closed for user ayushsingh
+Sep 03 15:36:16 lima-colima sshd[1239]: Accepted publickey for ayushsingh from 192.168.5.2 port 31133 ssh2: ED25519 SHA256:byz4/YMM7JxoIN5y6lBeWwSZTuUjPeMlq0Js+pxGp0I
+Sep 03 15:36:16 lima-colima sshd[1239]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
++ echo
+
++ echo '===== journalctl -b : logs since last boot, errors only ====='
+===== journalctl -b : logs since last boot, errors only =====
++ colima ssh -- journalctl -b -p err --no-pager -n 15
+Sep 03 15:36:04 ubuntu systemd-modules-load[128]: Failed to find module 'virtio_vsock'
+Sep 03 15:36:10 lima-colima dnsmasq[542]: directory /etc/resolv.conf for resolv-file is missing, cannot poll
+Sep 03 15:36:10 lima-colima dnsmasq[542]: FAILED to start up
+Sep 03 15:36:10 lima-colima systemd[1]: Failed to start dnsmasq.service - dnsmasq - A lightweight DHCP and caching DNS server.
+Sep 03 15:36:12 lima-colima sudo[724]: ayushsingh : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:12 lima-colima sudo[821]: ayushsingh : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:14 lima-colima sudo[1069]:     root : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:16 lima-colima sudo[1236]: ayushsingh : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:16 lima-colima sudo[1254]: ayushsingh : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:16 lima-colima sudo[1261]: ayushsingh : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:19 lima-colima sudo[1267]: ayushsingh : unable to resolve host lima-colima: Temporary failure in name resolution
+Sep 03 15:36:23 colima systemd[1]: Failed to start cloud-final.service - Cloud-init: Final Stage.
++ echo
+
++ echo '===== journalctl --since (time filter) ====='
+===== journalctl --since (time filter) =====
++ colima ssh -- journalctl --since '10 min ago' --no-pager
++ tail -15
+Sep 03 15:41:56 colima kernel: vethbce2a21 (unregistering): left allmulticast mode
+Sep 03 15:41:56 colima kernel: vethbce2a21 (unregistering): left promiscuous mode
+Sep 03 15:41:56 colima kernel: docker0: port 1(vethbce2a21) entered disabled state
+Sep 03 15:41:56 colima systemd[1]: run-docker-netns-c2ac2982cb5e.mount: Deactivated successfully.
+Sep 03 15:41:56 colima systemd[1]: mnt-lima\x2dcolima-docker-rootfs-overlayfs-e2b5d2d61c2079199a9453e81330f27e845b0d9021c56782c33a385fe2d9a036.mount: Deactivated successfully.
+Sep 03 15:41:56 colima systemd[1]: var-lib-docker-rootfs-overlayfs-e2b5d2d61c2079199a9453e81330f27e845b0d9021c56782c33a385fe2d9a036.mount: Deactivated successfully.
+Sep 03 15:41:57 colima systemd-networkd[395]: docker0: Lost carrier
+Sep 03 15:42:21 colima lima-guestagent[1143]: time="2026-09-03T15:42:21+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 101.893974ms)"
+Sep 03 15:43:51 colima lima-guestagent[1143]: time="2026-09-03T15:43:51+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 102.844771ms)"
+Sep 03 15:44:11 colima lima-guestagent[1143]: time="2026-09-03T15:44:11+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 118.726424ms)"
+Sep 03 15:44:31 colima lima-guestagent[1143]: time="2026-09-03T15:44:31+05:30" level=info msg="SyncTime: system time synchronized with host (drift was -122.735771ms)"
+Sep 03 15:45:11 colima lima-guestagent[1143]: time="2026-09-03T15:45:11+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 169.140653ms)"
+Sep 03 15:46:01 colima lima-guestagent[1143]: time="2026-09-03T15:46:01+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 105.166379ms)"
+Sep 03 15:46:31 colima lima-guestagent[1143]: time="2026-09-03T15:46:31+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 101.907806ms)"
+Sep 03 15:46:51 colima lima-guestagent[1143]: time="2026-09-03T15:46:51+05:30" level=info msg="SyncTime: system time synchronized with host (drift was 108.572323ms)"
++ echo
+
++ echo '===== systemctl list-units (context: which services journalctl can filter by -u) ====='
+===== systemctl list-units (context: which services journalctl can filter by -u) =====
++ colima ssh -- systemctl list-units --type=service --no-pager
++ head -15
+  UNIT                                           LOAD   ACTIVE SUB     DESCRIPTION
+  apparmor.service                               loaded active exited  Load AppArmor profiles
+  cloud-config.service                           loaded active exited  Cloud-init: Config Stage
+● cloud-final.service                            loaded failed failed  Cloud-init: Final Stage
+  cloud-init-local.service                       loaded active exited  Cloud-init: Local Stage (pre-network)
+  cloud-init.service                             loaded active exited  Cloud-init: Network Stage
+  containerd.service                             loaded active running containerd container runtime
+  dbus.service                                   loaded active running D-Bus System Message Bus
+  dnsmasq.service                                loaded active running dnsmasq - A lightweight DHCP and caching DNS server
+  docker.service                                 loaded active running Docker Application Container Engine
+  getty@tty1.service                             loaded active running Getty on tty1
+  kmod-static-nodes.service                      loaded active exited  Create List of Static Device Nodes
+  ldconfig.service                               loaded active exited  Rebuild Dynamic Linker Cache
+  lima-guestagent.service                        loaded active running lima-guestagent
+  serial-getty@hvc0.service                      loaded active running Serial Getty on hvc0

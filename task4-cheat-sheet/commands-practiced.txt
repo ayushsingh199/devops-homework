@@ -1,0 +1,54 @@
+$ pwd
+/Users/ayushsingh/Desktop/devops-homework/task4-cheat-sheet
+
+$ whoami
+ayushsingh
+
+$ uname -a
+Darwin Ayushs-MacBook-Air-2.local 23.6.0 Darwin Kernel Version 23.6.0: Mon Jul 29 21:14:21 PDT 2024; root:xnu-10063.141.2~1/RELEASE_ARM64_T8103 arm64
+
+$ uptime
+15:03  up 10 days, 21 hrs, 1 user, load averages: 4.03 4.05 3.57
+
+$ df -h /
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s1s1   228Gi    12Gi   8.1Gi    61%    404k   84M    0%   /
+
+$ mkdir -p demo/sub && touch demo/sub/file.txt
+
+$ ls -la demo/sub
+total 0
+drwxr-xr-x@ 3 ayushsingh  staff  96 Sep  3 15:03 .
+drwxr-xr-x@ 3 ayushsingh  staff  96 Sep  3 15:03 ..
+-rw-r--r--@ 1 ayushsingh  staff   0 Sep  3 15:03 file.txt
+
+$ echo "line1" > demo/sub/file.txt && echo "line2" >> demo/sub/file.txt
+
+$ cat demo/sub/file.txt
+line1
+line2
+
+$ grep "line2" demo/sub/file.txt
+line2
+
+$ chmod 600 demo/sub/file.txt && ls -l demo/sub/file.txt
+-rw-------@ 1 ayushsingh  staff  12 Sep  3 15:03 demo/sub/file.txt
+
+$ ps aux | awk "{print \$1,\$2,\$3,\$4,\$11}" | head -5
+USER PID %CPU %MEM COMMAND
+_windowserver 156 37.6 0.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+ayushsingh 72233 16.7 3.2 /Applications/Claude.app/Contents/Frameworks/Claude
+ayushsingh 72138 14.0 0.5 /Applications/Claude.app/Contents/Frameworks/Claude
+ayushsingh 30423 7.2 0.0 /bin/zsh
+
+$ tar -czvf demo.tar.gz demo/
+a demo
+a demo/sub
+a demo/sub/file.txt
+
+$ tar -tzvf demo.tar.gz
+drwxr-xr-x  0 ayushsingh staff       0 Sep  3 15:03 demo/
+drwxr-xr-x  0 ayushsingh staff       0 Sep  3 15:03 demo/sub/
+-rw-------  0 ayushsingh staff      12 Sep  3 15:03 demo/sub/file.txt
+
+$ rm -rf demo demo.tar.gz

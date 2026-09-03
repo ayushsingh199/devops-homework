@@ -1,0 +1,41 @@
+$ echo "Original file content" > original.txt
+
+$ cat original.txt
+Original file content
+
+$ ln original.txt hardlink.txt          # create a HARD link
+
+$ ln -s original.txt softlink.txt        # create a SOFT (symbolic) link
+
+$ ls -li
+total 24
+63111445 -rw-r--r--@ 2 ayushsingh  staff   22 Sep  3 15:03 hardlink.txt
+63111445 -rw-r--r--@ 2 ayushsingh  staff   22 Sep  3 15:03 original.txt
+63111448 lrwxr-xr-x@ 1 ayushsingh  staff   12 Sep  3 15:03 softlink.txt -> original.txt
+63111444 -rw-r--r--@ 1 ayushsingh  staff  234 Sep  3 15:03 transcript.txt
+
+$ stat -f "%N -> inode:%i  links:%l" original.txt hardlink.txt softlink.txt
+original.txt -> inode:63111445  links:2
+hardlink.txt -> inode:63111445  links:2
+softlink.txt -> inode:63111448  links:1
+
+# Hard link shares the SAME inode number & link count as the original.
+# Soft link has its OWN inode and just stores a path string.
+
+$ echo "Edited via hardlink" >> hardlink.txt
+
+$ cat original.txt   # change is visible here too, because it is the SAME data on disk
+Original file content
+Edited via hardlink
+
+$ rm original.txt   # delete the ORIGINAL file
+
+$ cat hardlink.txt   # hard link STILL WORKS - the data is not deleted until link count hits 0
+Original file content
+Edited via hardlink
+
+$ cat softlink.txt   # soft link is now BROKEN (dangling) - it only stored a path
+cat: softlink.txt: No such file or directory
+
+$ ls -l softlink.txt
+lrwxr-xr-x@ 1 ayushsingh  staff  12 Sep  3 15:03 softlink.txt -> original.txt

@@ -1,0 +1,52 @@
+Unable to find image 'ubuntu:22.04' locally
+22.04: Pulling from library/ubuntu
+231032373bb3: Pulling fs layer
+fd16aa656128: Download complete
+231032373bb3: Download complete
+231032373bb3: Pull complete
+Digest: sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
+Status: Downloaded newer image for ubuntu:22.04
++ apt-get update -qq
++ apt-get install -y -qq adduser passwd
+===== useradd (low-level) =====
++ echo '===== useradd (low-level) ====='
++ useradd testuser1
++ echo 'exit code: 0'
++ echo '-- /etc/passwd entry for testuser1 --'
++ grep testuser1 /etc/passwd
+exit code: 0
+-- /etc/passwd entry for testuser1 --
+testuser1:x:1000:1000::/home/testuser1:/bin/sh
++ echo '-- home dir exists? --'
++ ls -ld /home/testuser1
+-- home dir exists? --
+ls: cannot access '/home/testuser1': No such file or directory
++ echo 'No home directory was created (expected: useradd does not create one by default)'
++ echo
++ echo '===== adduser (interactive-friendly wrapper) ====='
++ adduser --disabled-password --gecos 'Test User Two' testuser2
+No home directory was created (expected: useradd does not create one by default)
+
+===== adduser (interactive-friendly wrapper) =====
+Adding user `testuser2' ...
+Adding new group `testuser2' (1001) ...
+Adding new user `testuser2' (1001) with group `testuser2' ...
+Creating home directory `/home/testuser2' ...
+Copying files from `/etc/skel' ...
+-- /etc/passwd entry for testuser2 --
++ echo '-- /etc/passwd entry for testuser2 --'
++ grep testuser2 /etc/passwd
+testuser2:x:1001:1001:Test User Two,,,:/home/testuser2:/bin/bash
++ echo '-- home dir exists? --'
+-- home dir exists? --
++ ls -ld /home/testuser2
+drwxr-x--- 2 testuser2 testuser2 4096 Sep  3 10:11 /home/testuser2
++ echo '-- skeleton files copied from /etc/skel --'
++ ls -la /home/testuser2
+-- skeleton files copied from /etc/skel --
+total 20
+drwxr-x--- 2 testuser2 testuser2 4096 Sep  3 10:11 .
+drwxr-xr-x 1 root      root      4096 Sep  3 10:11 ..
+-rw-r--r-- 1 testuser2 testuser2  220 Sep  3 10:11 .bash_logout
+-rw-r--r-- 1 testuser2 testuser2 3771 Sep  3 10:11 .bashrc
+-rw-r--r-- 1 testuser2 testuser2  807 Sep  3 10:11 .profile
