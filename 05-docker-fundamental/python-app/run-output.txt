@@ -1,0 +1,22 @@
+$ docker build -t python-hello .
+Step 3/5 : COPY app.py .
+ ---> b30c73dbb878
+Step 4/5 : EXPOSE 5000
+ ---> Running in 354d77f7b3a7
+ ---> Removed intermediate container 354d77f7b3a7
+ ---> 182d7913a868
+Step 5/5 : CMD ["python", "app.py"]
+ ---> Running in e8c36b16dbd2
+ ---> Removed intermediate container e8c36b16dbd2
+ ---> 54f337e97e34
+Successfully built 54f337e97e34
+Successfully tagged python-hello:latest
+
+$ docker run -d --name python-hello -p 8084:5000 python-hello
+630ec9e74c258565eadc33fbca81a72d41a4a4c045471a4a40a91f4c0fac1ff7
+
+$ curl -s http://localhost:8084
+<h1>Hello World from Python</h1>
+$ docker ps --filter name=python-hello
+CONTAINER ID   IMAGE          COMMAND           CREATED         STATUS         PORTS                                         NAMES
+630ec9e74c25   python-hello   "python app.py"   2 seconds ago   Up 2 seconds   0.0.0.0:8084->5000/tcp, [::]:8084->5000/tcp   python-hello

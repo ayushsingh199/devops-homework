@@ -1,0 +1,85 @@
+$ docker build -t react-hello .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon   7.68kB
+Step 1/9 : FROM node:20-alpine AS build
+ ---> fb4cd12c85ee
+Step 2/9 : WORKDIR /app
+ ---> Using cache
+ ---> 2eb46963abc4
+Step 3/9 : COPY package.json .
+ ---> 5a67d71adf90
+Step 4/9 : RUN npm install
+ ---> Running in 7a83249500f4
+
+added 62 packages, and audited 63 packages in 36s
+
+7 packages are looking for funding
+  run `npm fund` for details
+
+2 vulnerabilities (1 moderate, 1 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[91mnpm notice
+npm notice New major version of npm available! 10.8.2 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+[0m ---> Removed intermediate container 7a83249500f4
+ ---> 02083c5be88c
+Step 5/9 : COPY . .
+ ---> 441af59ccb90
+Step 6/9 : RUN npm run build
+ ---> Running in 6c4293dce586
+
+> react-app@0.0.1 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 29 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  0.20 kB │ gzip:  0.17 kB
+dist/assets/index-DnZR9tUp.js  142.52 kB │ gzip: 45.74 kB
+✓ built in 3.63s
+ ---> Removed intermediate container 6c4293dce586
+ ---> 2278016eda0f
+Step 7/9 : FROM nginx:alpine
+ ---> a9ae6f6d078d
+Step 8/9 : COPY --from=build /app/dist /usr/share/nginx/html
+ ---> d14a807b9f10
+Step 9/9 : EXPOSE 80
+ ---> Running in 514cd6a64e56
+ ---> Removed intermediate container 514cd6a64e56
+ ---> 0a9b2c8369ef
+Successfully built 0a9b2c8369ef
+Successfully tagged react-hello:latest
+
+$ docker run -d --name react-hello -p 8086:80 react-hello
+1c8fbcf836f5588cf9578f538ee73a1ca7e73ca315bde9ae74313278f3570232
+
+$ curl -s http://localhost:8086
+<!doctype html>
+<html>
+  <head><title>React Hello World</title>  <script type="module" crossorigin src="/assets/index-DnZR9tUp.js"></script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+
+$ docker ps --filter name=react-hello
+CONTAINER ID   IMAGE         COMMAND                  CREATED         STATUS         PORTS                                     NAMES
+1c8fbcf836f5   react-hello   "/docker-entrypoint.…"   4 seconds ago   Up 3 seconds   0.0.0.0:8086->80/tcp, [::]:8086->80/tcp   react-hello
+
+----- Note -----
+# curl only returns the raw index.html shell above, because React renders
+# "Hello World from React" client-side after the JS bundle loads (SPA behavior).
+# Verified visually in a real browser pointed at http://localhost:8086 —
+# see ../../screenshots/05-docker-react.png for the actual rendered page.

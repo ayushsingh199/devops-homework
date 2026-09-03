@@ -1,0 +1,27 @@
+$ docker build -t nginx-hello .
+Status: Downloaded newer image for nginx:alpine
+ ---> a9ae6f6d078d
+Step 2/3 : COPY index.html /usr/share/nginx/html/index.html
+ ---> 71f20e7ae678
+Step 3/3 : EXPOSE 80
+ ---> Running in da44ea49a137
+ ---> Removed intermediate container da44ea49a137
+ ---> a98ae404f5a5
+Successfully built a98ae404f5a5
+Successfully tagged nginx-hello:latest
+
+$ docker run -d --name nginx-hello -p 8081:80 nginx-hello
+ccb00e9cf425a2c9db5a05e7494f115e310518cd5fc2d8644d5db4665f59e7cc
+
+$ curl -s http://localhost:8081
+<!doctype html>
+<html>
+  <head><title>Nginx Hello World</title></head>
+  <body>
+    <h1>Hello World from Nginx</h1>
+  </body>
+</html>
+
+$ docker ps --filter name=nginx-hello
+CONTAINER ID   IMAGE         COMMAND                  CREATED         STATUS         PORTS                                     NAMES
+ccb00e9cf425   nginx-hello   "/docker-entrypoint.…"   2 seconds ago   Up 2 seconds   0.0.0.0:8081->80/tcp, [::]:8081->80/tcp   nginx-hello

@@ -1,0 +1,54 @@
+$ docker build -t java-hello .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  4.608kB
+Step 1/6 : FROM eclipse-temurin:21-jdk-alpine
+21-jdk-alpine: Pulling from library/eclipse-temurin
+ef400840b5e6: Pulling fs layer
+a907c6aa2e98: Pulling fs layer
+7bddbfbcf00f: Pulling fs layer
+981f95701eab: Pulling fs layer
+82056d6bbbcf: Download complete
+522ca9254b53: Download complete
+981f95701eab: Download complete
+ef400840b5e6: Download complete
+a907c6aa2e98: Download complete
+a907c6aa2e98: Pull complete
+7bddbfbcf00f: Download complete
+7bddbfbcf00f: Pull complete
+981f95701eab: Pull complete
+ef400840b5e6: Pull complete
+Digest: sha256:6ea5548706b60ac0a602eaf48af74792cbab012d90e811ca8db6184b16b5c3d6
+Status: Downloaded newer image for eclipse-temurin:21-jdk-alpine
+ ---> 6ea5548706b6
+Step 2/6 : WORKDIR /app
+ ---> Running in b8a9c01ec89c
+ ---> Removed intermediate container b8a9c01ec89c
+ ---> 03d9973e4c77
+Step 3/6 : COPY HelloWorld.java .
+ ---> 806474bcf614
+Step 4/6 : RUN javac HelloWorld.java
+ ---> Running in 75252a791923
+ ---> Removed intermediate container 75252a791923
+ ---> dd290aa0ea12
+Step 5/6 : EXPOSE 8000
+ ---> Running in 79469172f03c
+ ---> Removed intermediate container 79469172f03c
+ ---> 1317f7a07edf
+Step 6/6 : CMD ["java", "HelloWorld"]
+ ---> Running in 8b0d5e802223
+ ---> Removed intermediate container 8b0d5e802223
+ ---> 2ee04f79da69
+Successfully built 2ee04f79da69
+Successfully tagged java-hello:latest
+
+$ docker run -d --name java-hello -p 8085:8000 java-hello
+208c42f466c1d8b9caa53b46ecc8bbb437377a26982ea9573bc057290cd86b2f
+
+$ curl -s http://localhost:8085
+<h1>Hello World from Java</h1>
+$ docker ps --filter name=java-hello
+CONTAINER ID   IMAGE        COMMAND                  CREATED         STATUS         PORTS                                         NAMES
+208c42f466c1   java-hello   "/__cacert_entrypoin…"   4 seconds ago   Up 3 seconds   0.0.0.0:8085->8000/tcp, [::]:8085->8000/tcp   java-hello

@@ -1,0 +1,25 @@
+$ docker build -t nodejs-hello .
+Step 3/5 : COPY server.js .
+ ---> 8f3ad0c31cf3
+Step 4/5 : EXPOSE 3000
+ ---> Running in dc646143fd79
+ ---> Removed intermediate container dc646143fd79
+ ---> 7e31e64c3b41
+Step 5/5 : CMD ["node", "server.js"]
+ ---> Running in eb460eb04abc
+ ---> Removed intermediate container eb460eb04abc
+ ---> 1a3696fd0c34
+Successfully built 1a3696fd0c34
+Successfully tagged nodejs-hello:latest
+
+$ docker run -d --name nodejs-hello -p 8083:3000 nodejs-hello
+ef187dffeb55adad54dec83e68f7132d410e3823ee88ba1e526c6fd301eedfb0
+
+$ curl -s http://localhost:8083
+<h1>Hello World from Node.js</h1>
+$ docker ps --filter name=nodejs-hello
+CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS                                         NAMES
+ef187dffeb55   nodejs-hello   "docker-entrypoint.s…"   2 seconds ago   Up 2 seconds   0.0.0.0:8083->3000/tcp, [::]:8083->3000/tcp   nodejs-hello
+
+$ docker logs nodejs-hello
+Node.js server running on port 3000

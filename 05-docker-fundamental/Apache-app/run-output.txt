@@ -1,0 +1,27 @@
+$ docker build -t apache-hello .
+Status: Downloaded newer image for httpd:alpine
+ ---> 1b766f17b840
+Step 2/3 : COPY index.html /usr/local/apache2/htdocs/index.html
+ ---> f2e295cff546
+Step 3/3 : EXPOSE 80
+ ---> Running in e2fa7b0bcee6
+ ---> Removed intermediate container e2fa7b0bcee6
+ ---> 9767b94ab3cb
+Successfully built 9767b94ab3cb
+Successfully tagged apache-hello:latest
+
+$ docker run -d --name apache-hello -p 8082:80 apache-hello
+80eb19155e51eb76371b6d17dc80a06bc01170c6ed053f61f6bef61269fc157f
+
+$ curl -s http://localhost:8082
+<!doctype html>
+<html>
+  <head><title>Apache Hello World</title></head>
+  <body>
+    <h1>Hello World from Apache</h1>
+  </body>
+</html>
+
+$ docker ps --filter name=apache-hello
+CONTAINER ID   IMAGE          COMMAND              CREATED         STATUS         PORTS                                     NAMES
+80eb19155e51   apache-hello   "httpd-foreground"   2 seconds ago   Up 2 seconds   0.0.0.0:8082->80/tcp, [::]:8082->80/tcp   apache-hello
