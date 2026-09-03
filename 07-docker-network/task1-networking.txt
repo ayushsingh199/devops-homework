@@ -1,0 +1,44 @@
+===== Task 1: Docker Container Networking =====
+
+$ docker network create net-frontend && docker network create net-backend && docker network create net-database
+(already created earlier in this session — see docker network ls below)
+NETWORK ID     NAME           DRIVER    SCOPE
+d33cbeac05b4   net-backend    bridge    local
+aea86a94553b   net-database   bridge    local
+db690ff749d6   net-frontend   bridge    local
+
+$ docker run -d --name frontend --network net-frontend nginx:alpine
+cbe8c1dd033e8a689c6008b565a2f28826d3ee3b5c54b1e2ec03a51e60fd4dae
+$ docker run -d --name backend --network net-backend nginx:alpine
+50aa3d7888161d2d983d05be1a97cd82e68ceb5fa9eddc8bee183dd056072f2c
+$ docker run -d --name database --network net-database -e MYSQL_ROOT_PASSWORD=rootpass mysql:8.0
+3e3c5261d2192159d567d21c10327d5b8a77721a8d2226af47136614de7c8579
+
+$ docker ps
+CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS                 NAMES
+3e3c5261d219   mysql:8.0      "docker-entrypoint.s…"   5 seconds ago   Up 5 seconds   3306/tcp, 33060/tcp   database
+50aa3d788816   nginx:alpine   "/docker-entrypoint.…"   6 seconds ago   Up 5 seconds   80/tcp                backend
+cbe8c1dd033e   nginx:alpine   "/docker-entrypoint.…"   6 seconds ago   Up 5 seconds   80/tcp                frontend
+
+----- Connect backend to the other 2 networks as well -----
+$ docker network connect net-frontend backend && docker network connect net-database backend
+
+$ docker network inspect net-frontend --format "members: {{range .Containers}}{{.Name}} {{end}}"
+members: backend frontend 
+$ docker network inspect net-backend --format "members: {{range .Containers}}{{.Name}} {{end}}"
+members: backend 
+$ docker network inspect net-database --format "members: {{range .Containers}}{{.Name}} {{end}}"
+members: database backend 
+
+----- Connectivity check -----
+$ docker exec backend ping -c 2 frontend      # SAME network (net-frontend) -> should succeed
+PING frontend (172.18.0.2): 56 data bytes
+64 bytes from 172.18.0.2: seq=0 ttl=64 time=0.147 ms
+64 bytes from 172.18.0.2: seq=1 ttl=64 time=0.130 ms
+
+--- frontend ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.130/0.138/0.147 ms
+
+$ docker exec frontend ping -c 2 database      # NO shared network -> should FAIL
+ping: bad address 'database'

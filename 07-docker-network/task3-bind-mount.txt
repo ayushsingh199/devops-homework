@@ -1,0 +1,20 @@
+===== Task 3: Bind Mount =====
+
+$ mkdir bind-mount-demo && echo "Hello students" > bind-mount-demo/index.html
+Hello students
+
+$ docker run -d --name bindmount-nginx -p 8095:80 -v "/Users/ayushsingh/Desktop/devops-homework/07-docker-network/bind-mount-demo":/usr/share/nginx/html nginx:alpine
+823dea853ce59e581792a46ad255c673aac1fda2d8c394050414bebe270a7f8a
+
+$ curl -s http://localhost:8095
+Hello students
+
+----- Modify the file on the HOST, without touching the container -----
+$ echo "Hello students - updated live!" > bind-mount-demo/index.html
+
+$ curl -s http://localhost:8095    # NO container restart happened — bind mount reflects it live
+Hello students - updated live!
+
+$ docker ps --filter name=bindmount-nginx
+CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS                                     NAMES
+823dea853ce5   nginx:alpine   "/docker-entrypoint.…"   2 seconds ago   Up 2 seconds   0.0.0.0:8095->80/tcp, [::]:8095->80/tcp   bindmount-nginx

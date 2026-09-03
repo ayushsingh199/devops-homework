@@ -1,0 +1,25 @@
+===== Task 2: Host Network =====
+
+$ docker pull httpd:alpine
+alpine: Pulling from library/httpd
+Digest: sha256:1b766f17b84026429b7cb243317b142921b24432336e798bc881c43f45ed9567
+Status: Image is up to date for httpd:alpine
+docker.io/library/httpd:alpine
+
+$ docker run -d --name apache-host --network host httpd:alpine
+658409e0efb15c0e676c295f72862c8eceb7102de9ba4c27a14d20c8a7580822
+
+$ curl -s http://localhost:80
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<title>It works! Apache httpd</title>
+</head>
+<body>
+<p>It works!</p>
+</body>
+</html>
+
+$ docker ps --filter name=apache-host    # note: no PORTS mapping shown — host network shares the VM's network stack directly
+CONTAINER ID   IMAGE          COMMAND              CREATED         STATUS         PORTS     NAMES
+658409e0efb1   httpd:alpine   "httpd-foreground"   2 seconds ago   Up 2 seconds             apache-host
