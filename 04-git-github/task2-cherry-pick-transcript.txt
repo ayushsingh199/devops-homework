@@ -1,0 +1,61 @@
+$ git init -q && git config user.email ... && git config user.name ...
+
+----- Create 2-4 commits on main -----
+$ git log --oneline
+0323da8 main: add feature C
+d06be68 main: add feature B
+7262d83 main: add feature A
+
+----- Create a new branch -----
+$ git checkout -b feature-branch
+
+----- Make 2-3 commits on the new branch (each touches its own independent file) -----
+$ git log --oneline
+c782217 branch: another unrelated feature
+36b98e8 branch: critical bugfix
+81879ce branch: unrelated cosmetic change
+0323da8 main: add feature C
+d06be68 main: add feature B
+7262d83 main: add feature A
+
+----- Identify the specific commit to cherry-pick (the bugfix) -----
+Target commit (the bugfix): 36b98e88cbc68e897e37055bb9cdac23bb6a784e
+commit 36b98e88cbc68e897e37055bb9cdac23bb6a784e
+Author: ayushsingh199 <anushkaj460@gmail.com>
+Date:   Thu Sep 3 15:57:43 2026 +0530
+
+    branch: critical bugfix
+
+diff --git a/bugfix.txt b/bugfix.txt
+new file mode 100644
+index 0000000..f6f8a97
+--- /dev/null
++++ b/bugfix.txt
+@@ -0,0 +1 @@
++BUGFIX: off-by-one error corrected
+
+----- Switch back to main and cherry-pick ONLY that commit -----
+$ git checkout main
+$ git cherry-pick 36b98e88cbc68e897e37055bb9cdac23bb6a784e
+[main 7eadceb] branch: critical bugfix
+ Date: Thu Sep 3 15:57:43 2026 +0530
+ 1 file changed, 1 insertion(+)
+ create mode 100644 bugfix.txt
+
+----- Verify: bugfix.txt IS on main, cosmetic.txt / wip_feature.txt are NOT -----
+$ git log --oneline
+7eadceb branch: critical bugfix
+0323da8 main: add feature C
+d06be68 main: add feature B
+7262d83 main: add feature A
+
+$ ls
+bugfix.txt
+file.txt
+
+$ cat bugfix.txt
+BUGFIX: off-by-one error corrected
+
+$ git branch -a
+  feature-branch
+* main
