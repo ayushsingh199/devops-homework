@@ -1,0 +1,49 @@
+$ systemctl --version
+systemd 255 (255.4-1ubuntu8.15)
++PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified
+
+$ systemctl list-units --type=service --state=running --no-pager | head -15
+  UNIT                      LOAD   ACTIVE SUB     DESCRIPTION
+  dbus.service              loaded active running D-Bus System Message Bus
+  dnsmasq.service           loaded active running dnsmasq - A lightweight DHCP and caching DNS server
+  getty@tty1.service        loaded active running Getty on tty1
+  lima-guestagent.service   loaded active running lima-guestagent
+  serial-getty@hvc0.service loaded active running Serial Getty on hvc0
+  ssh.service               loaded active running OpenBSD Secure Shell server
+  systemd-fsckd.service     loaded active running File System Check Daemon to report status
+  systemd-journald.service  loaded active running Journal Service
+  systemd-logind.service    loaded active running User Login Management
+  systemd-networkd.service  loaded active running Network Configuration
+  systemd-timesyncd.service loaded active running Network Time Synchronization
+  systemd-udevd.service     loaded active running Rule-based Manager for Device Events and Files
+  user@501.service          loaded active running User Manager for UID 501
+
+
+$ systemctl status ssh --no-pager
+● ssh.service - OpenBSD Secure Shell server
+     Loaded: loaded (/usr/lib/systemd/system/ssh.service; disabled; preset: enabled)
+     Active: active (running) since Thu 2026-09-03 16:05:47 IST; 20s ago
+TriggeredBy: ● ssh.socket
+       Docs: man:sshd(8)
+             man:sshd_config(5)
+   Main PID: 579 (sshd)
+      Tasks: 1 (limit: 2297)
+     Memory: 3.8M (peak: 5.0M)
+        CPU: 116ms
+     CGroup: /system.slice/ssh.service
+             └─579 "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups"
+
+Sep 03 16:05:47 colima systemd[1]: Started ssh.service - OpenBSD Secure Shell server.
+Sep 03 16:05:47 colima sshd[586]: Connection closed by 192.168.5.2 port 63812
+Sep 03 16:05:48 colima sshd[744]: Accepted publickey for ayushsingh from 192.168.5.2 port 24670 ssh2: ED25519 SHA256:byz4/YMM7JxoIN5y6lBeWwSZTuUjPeMlq0Js+pxGp0I
+Sep 03 16:05:48 colima sshd[744]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
+Sep 03 16:05:48 colima sshd[744]: pam_unix(sshd:session): session closed for user ayushsingh
+Sep 03 16:05:48 colima sshd[901]: Accepted publickey for ayushsingh from 192.168.5.2 port 29741 ssh2: ED25519 SHA256:byz4/YMM7JxoIN5y6lBeWwSZTuUjPeMlq0Js+pxGp0I
+Sep 03 16:05:48 colima sshd[901]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
+Sep 03 16:05:48 colima sshd[901]: pam_unix(sshd:session): session closed for user ayushsingh
+Sep 03 16:05:49 colima sshd[931]: Accepted publickey for ayushsingh from 192.168.5.2 port 47612 ssh2: ED25519 SHA256:byz4/YMM7JxoIN5y6lBeWwSZTuUjPeMlq0Js+pxGp0I
+Sep 03 16:05:49 colima sshd[931]: pam_unix(sshd:session): session opened for user ayushsingh(uid=501) by ayushsingh(uid=0)
+
+$ systemctl is-active docker
+inactive
+time="2026-09-03T16:06:08+05:30" level=fatal msg="exit status 3"
