@@ -1,0 +1,222 @@
+===== Kubernetes Networking & Services (all 5 service types, real cluster) =====
+
+$ kubectl apply -f deployment.yml
+deployment.apps/web-app created
+Waiting for deployment "web-app" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "web-app" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "web-app" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "web-app" rollout to finish: 2 of 3 updated replicas are available...
+deployment "web-app" successfully rolled out
+$ kubectl get pods -l app=web-app -o wide
+NAME                       READY   STATUS    RESTARTS   AGE   IP           NODE     NOMINATED NODE   READINESS GATES
+web-app-7bbff855cc-l68sj   1/1     Running   0          4s    10.42.0.26   colima   <none>           <none>
+web-app-7bbff855cc-m6wkj   1/1     Running   0          4s    10.42.0.27   colima   <none>           <none>
+web-app-7bbff855cc-wtzzj   1/1     Running   0          4s    10.42.0.28   colima   <none>           <none>
+
+----- 1. ClusterIP (default, internal only) -----
+$ cat 01-clusterip.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-clusterip
+spec:
+  type: ClusterIP   # default — internal only
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 80
+service/web-clusterip created
+$ kubectl get svc web-clusterip
+NAME            TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+web-clusterip   ClusterIP   10.43.137.39   <none>        80/TCP    0s
+$ from inside the cluster: kubectl run tester --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- --timeout=3 web-clusterip
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+warning: couldn't attach to pod/tester, falling back to streaming logs: Internal error occurred: unable to upgrade connection: container tester not found in pod tester_default
+<title>Welcome to nginx!</title>
+
+----- 2. NodePort (reachable on every node at a fixed high port) -----
+$ cat 02-nodeport.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+service/web-nodeport created
+$ kubectl get svc web-nodeport
+NAME           TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+web-nodeport   NodePort   10.43.62.209   <none>        80:30080/TCP   0s
+$ curl -s http://localhost:30080 | grep -i title      # colima forwards the node IP to the Mac
+
+----- 3. LoadBalancer (k3s servicelb assigns a real external IP locally) -----
+$ cat 03-loadbalancer.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 80
+service/web-loadbalancer created
+$ kubectl get svc web-loadbalancer
+NAME               TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+web-loadbalancer   LoadBalancer   10.43.152.33   <pending>     80:30261/TCP   5s
+$ curl -s http:// | grep -i title
+
+----- 2. NodePort (retry -- iptables rules need a moment to propagate after service creation) -----
+$ curl -s http://localhost:30080 | grep -i title
+<title>Welcome to nginx!</title>
+
+----- 3. LoadBalancer (fixed port conflict -- see 03-loadbalancer.yml comment) -----
+$ cat 03-loadbalancer.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+    - port: 8888       # a different external port -- port 80 is already claimed by
+      targetPort: 80    # the ingress-nginx-controller's own LoadBalancer service on this
+                         # single-node cluster (servicelb binds one hostPort per LB service)
+service/web-loadbalancer created
+$ kubectl get pods -n kube-system -l svccontroller.k3s.cattle.io/svcname=web-loadbalancer   # servicelb helper pod
+svclb-ingress-nginx-controller-f9776aea-sjqlz   2/2     Running   0          5m49s
+svclb-web-loadbalancer-dab4a472-24lkv           1/1     Running   0          8s
+$ kubectl get svc web-loadbalancer
+NAME               TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+web-loadbalancer   LoadBalancer   10.43.227.160   192.168.5.1   8888:31034/TCP   8s
+$ curl -s http://192.168.5.1:8888 | grep -i title
+(k3s's built-in servicelb assigned the node's own IP as the external IP -- on a real cloud
+ provider [AWS/GCP/Azure], the same "type: LoadBalancer" spec would instead provision a real
+ cloud load balancer with the cloud's own public/external IP -- Kubernetes stays identical either way)
+
+----- 4. ExternalName (pure DNS CNAME alias, no selector, no pods, no proxying) -----
+$ cat 04-externalname.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-google
+spec:
+  type: ExternalName
+  externalName: www.google.com
+service/external-google created
+$ kubectl get svc external-google
+NAME              TYPE           CLUSTER-IP   EXTERNAL-IP      PORT(S)   AGE
+external-google   ExternalName   <none>       www.google.com   <none>    0s
+$ kubectl run dnstest --rm -i --restart=Never --image=busybox:1.36 -- nslookup external-google
+Server:		10.43.0.10
+Address:	10.43.0.10:53
+
+** server can't find external-google.cluster.local: NXDOMAIN
+
+** server can't find external-google.cluster.local: NXDOMAIN
+
+** server can't find external-google.svc.cluster.local: NXDOMAIN
+
+** server can't find external-google.svc.cluster.local: NXDOMAIN
+
+external-google.default.svc.cluster.local	canonical name = www.google.com
+
+external-google.default.svc.cluster.local	canonical name = www.google.com
+Name:	www.google.com
+Address: 142.251.154.119
+Name:	www.google.com
+Address: 142.251.152.119
+Name:	www.google.com
+Address: 142.251.157.119
+Name:	www.google.com
+Address: 142.251.156.119
+Name:	www.google.com
+Address: 142.251.153.119
+Name:	www.google.com
+Address: 142.251.150.119
+Name:	www.google.com
+Address: 142.251.151.119
+Name:	www.google.com
+Address: 142.251.155.119
+
+
+----- 5. Headless Service (clusterIP: None -- DNS returns every pod IP directly) -----
+$ cat 05-headless.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-headless
+spec:
+  clusterIP: None   # <-- headless
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 80
+service/web-headless created
+$ kubectl get svc web-headless      # note CLUSTER-IP column: "None"
+NAME           TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+web-headless   ClusterIP   None         <none>        80/TCP    0s
+$ kubectl run dnstest2 --rm -i --restart=Never --image=busybox:1.36 -- nslookup web-headless
+Server:		10.43.0.10
+Address:	10.43.0.10:53
+
+Name:	web-headless.default.svc.cluster.local
+Address: 10.42.0.28
+Name:	web-headless.default.svc.cluster.local
+Address: 10.42.0.27
+Name:	web-headless.default.svc.cluster.local
+Address: 10.42.0.26
+
+** server can't find web-headless.svc.cluster.local: NXDOMAIN
+
+** server can't find web-headless.cluster.local: NXDOMAIN
+
+
+** server can't find web-headless.svc.cluster.local: NXDOMAIN
+
+** server can't find web-headless.cluster.local: NXDOMAIN
+
+(compare: nslookup on the ClusterIP service returns ONE IP -- the virtual service IP.
+ nslookup on the headless service returns THREE IPs -- one per backing pod, directly.)
+$ kubectl run dnstest3 --rm -i --restart=Never --image=busybox:1.36 -- nslookup web-clusterip
+Server:		10.43.0.10
+Address:	10.43.0.10:53
+
+** server can't find web-clusterip.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.svc.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.svc.cluster.local: NXDOMAIN
+
+
+Name:	web-clusterip.default.svc.cluster.local
+Address: 10.43.137.39
+
+$ curl -s http://192.168.5.1:8888 | grep -i title      # (no output -- 192.168.5.1 is the colima VM's
+  private network, not reachable directly from the Mac host, unlike Docker -p port publishing)
+$ colima ssh -- curl -s http://192.168.5.1:8888 | grep -i title      # from INSIDE the VM, it works:
+<title>Welcome to nginx!</title>
+
+----- Cleanup -----
+$ kubectl delete svc web-clusterip web-nodeport web-loadbalancer external-google web-headless
+service "web-clusterip" deleted from default namespace
+service "web-nodeport" deleted from default namespace
+service "web-loadbalancer" deleted from default namespace
+service "external-google" deleted from default namespace
+service "web-headless" deleted from default namespace
+$ kubectl delete deployment web-app
+deployment.apps "web-app" deleted from default namespace

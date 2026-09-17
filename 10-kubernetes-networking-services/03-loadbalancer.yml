@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+    - port: 8888       # a different external port -- port 80 is already claimed by
+      targetPort: 80    # the ingress-nginx-controller's own LoadBalancer service on this
+                         # single-node cluster (servicelb binds one hostPort per LB service)

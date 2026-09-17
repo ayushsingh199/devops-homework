@@ -1,0 +1,120 @@
+===== Kubernetes Fundamentals =====
+
+$ kubectl version --client
+Client Version: v1.37.0
+Kustomize Version: v5.8.1
+
+$ kubectl cluster-info
+Kubernetes control plane is running at https://127.0.0.1:53705
+CoreDNS is running at https://127.0.0.1:53705/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+Metrics-server is running at https://127.0.0.1:53705/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+$ kubectl get nodes -o wide
+NAME     STATUS   ROLES           AGE     VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME
+colima   Ready    control-plane   3m17s   v1.35.0+k3s1   192.168.5.1   <none>        Ubuntu 24.04.4 LTS   6.8.0-117-generic   docker://29.5.2
+
+$ kubectl describe node colima | head -25
+Name:               colima
+Roles:              control-plane
+Labels:             beta.kubernetes.io/arch=arm64
+                    beta.kubernetes.io/instance-type=k3s
+                    beta.kubernetes.io/os=linux
+                    kubernetes.io/arch=arm64
+                    kubernetes.io/hostname=colima
+                    kubernetes.io/os=linux
+                    node-role.kubernetes.io/control-plane=true
+                    node.kubernetes.io/instance-type=k3s
+Annotations:        alpha.kubernetes.io/provided-node-ip: 192.168.5.1
+                    flannel.alpha.coreos.com/backend-data: {"VNI":1,"VtepMAC":"2e:3d:2f:fe:5d:06"}
+                    flannel.alpha.coreos.com/backend-type: vxlan
+                    flannel.alpha.coreos.com/kube-subnet-manager: true
+                    flannel.alpha.coreos.com/public-ip: 192.168.5.1
+                    k3s.io/hostname: colima
+                    k3s.io/internal-ip: 192.168.5.1
+                    k3s.io/node-args:
+                      ["server","--write-kubeconfig-mode","644","--disable","traefik","--docker","--flannel-iface","eth0","--https-listen-port","53705"]
+                    k3s.io/node-config-hash: RWSSRSE5MDTSCCCODEI46N7YO45MHALIWYB5JOVVVAT3NOCBVVXA====
+                    k3s.io/node-env: {}
+                    node.alpha.kubernetes.io/ttl: 0
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Thu, 17 Sep 2026 23:23:40 +0530
+Taints:             <none>
+
+$ kubectl get pods -A -o wide      # every control-plane + system component running as pods
+NAMESPACE       NAME                                            READY   STATUS      RESTARTS   AGE     IP          NODE     NOMINATED NODE   READINESS GATES
+ingress-nginx   ingress-nginx-admission-create-kjfr6            0/1     Completed   0          75s     10.42.0.7   colima   <none>           <none>
+ingress-nginx   ingress-nginx-admission-patch-jmjh9             0/1     Completed   0          75s     10.42.0.6   colima   <none>           <none>
+ingress-nginx   ingress-nginx-controller-6d6c8bdd44-bt4pl       1/1     Running     0          75s     10.42.0.8   colima   <none>           <none>
+kube-system     coredns-54bf7cdff9-4g6tk                        1/1     Running     0          3m13s   10.42.0.2   colima   <none>           <none>
+kube-system     local-path-provisioner-69879d7dd7-d2plj         1/1     Running     0          3m13s   10.42.0.3   colima   <none>           <none>
+kube-system     metrics-server-77dbbf84b-zgn94                  1/1     Running     0          3m13s   10.42.0.4   colima   <none>           <none>
+kube-system     svclb-ingress-nginx-controller-f9776aea-sjqlz   2/2     Running     0          75s     10.42.0.5   colima   <none>           <none>
+
+$ kubectl api-resources | head -20     # the object "kinds" the API server exposes
+NAME                                SHORTNAMES   APIVERSION                        NAMESPACED   KIND
+bindings                                         v1                                true         Binding
+componentstatuses                   cs           v1                                false        ComponentStatus
+configmaps                          cm           v1                                true         ConfigMap
+endpoints                           ep           v1                                true         Endpoints
+events                              ev           v1                                true         Event
+limitranges                         limits       v1                                true         LimitRange
+namespaces                          ns           v1                                false        Namespace
+nodes                               no           v1                                false        Node
+persistentvolumeclaims              pvc          v1                                true         PersistentVolumeClaim
+persistentvolumes                   pv           v1                                false        PersistentVolume
+pods                                po           v1                                true         Pod
+podtemplates                                     v1                                true         PodTemplate
+replicationcontrollers              rc           v1                                true         ReplicationController
+resourcequotas                      quota        v1                                true         ResourceQuota
+secrets                                          v1                                true         Secret
+serviceaccounts                     sa           v1                                true         ServiceAccount
+services                            svc          v1                                true         Service
+mutatingwebhookconfigurations                    admissionregistration.k8s.io/v1   false        MutatingWebhookConfiguration
+validatingadmissionpolicies                      admissionregistration.k8s.io/v1   false        ValidatingAdmissionPolicy
+
+----- Fundamentals: run a single Pod imperatively, expose it, then delete it -----
+$ kubectl run hello --image=nginx:alpine --port=80
+pod/hello created
+$ kubectl get pod hello -o wide
+NAME    READY   STATUS    RESTARTS   AGE   IP          NODE     NOMINATED NODE   READINESS GATES
+hello   1/1     Running   0          5s    10.42.0.9   colima   <none>           <none>
+$ kubectl expose pod hello --port=80 --name=hello-svc
+service/hello-svc exposed
+$ kubectl get svc hello-svc
+NAME        TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+hello-svc   ClusterIP   10.43.239.41   <none>        80/TCP    1s
+$ kubectl run curler --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- hello-svc
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+pod "curler" deleted from default namespace
+
+$ kubectl delete svc hello-svc && kubectl delete pod hello
+service "hello-svc" deleted from default namespace
+pod "hello" deleted from default namespace

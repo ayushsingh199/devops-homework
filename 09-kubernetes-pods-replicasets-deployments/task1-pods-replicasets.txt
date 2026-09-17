@@ -1,0 +1,181 @@
+===== Kubernetes Pods, ReplicaSets & Deployments =====
+
+----- Part 1: a bare Pod (no self-healing) -----
+$ cat pod.yml
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: nginx-pod
+  labels:
+    app: nginx
+
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+$ kubectl apply -f pod.yml
+pod/nginx-pod created
+$ kubectl get pod nginx-pod -o wide
+NAME        READY   STATUS              RESTARTS   AGE   IP       NODE     NOMINATED NODE   READINESS GATES
+nginx-pod   0/1     ContainerCreating   0          3s    <none>   colima   <none>           <none>
+
+$ kubectl delete pod nginx-pod --wait=false && sleep 2 && kubectl get pod nginx-pod
+pod "nginx-pod" deleted from default namespace
+NAME        READY   STATUS        RESTARTS   AGE
+nginx-pod   0/1     Terminating   0          5s
+(a bare Pod has no controller — once deleted, nothing recreates it)
+
+----- Part 2: ReplicaSet (self-healing, fixed replica count) -----
+$ cat replicaset.yml
+apiVersion: apps/v1
+kind: ReplicaSet
+
+metadata:
+  name: nginx-rs
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      labels:
+        app: nginx
+
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+$ kubectl apply -f replicaset.yml
+replicaset.apps/nginx-rs created
+$ kubectl get rs nginx-rs && kubectl get pods -l app=nginx
+NAME       DESIRED   CURRENT   READY   AGE
+nginx-rs   3         3         0       5s
+NAME             READY   STATUS              RESTARTS   AGE
+nginx-pod        0/1     Terminating         0          10s
+nginx-rs-7r4rt   0/1     ContainerCreating   0          5s
+nginx-rs-jjzzt   0/1     ContainerCreating   0          5s
+nginx-rs-wvbtg   0/1     ContainerCreating   0          5s
+
+$ --- proving self-healing: delete one pod, watch the ReplicaSet recreate it ---
+$ kubectl delete pod nginx-pod
+pod "nginx-pod" deleted from default namespace
+$ kubectl get pods -l app=nginx      # still 3 pods -- a NEW one was created to replace it
+NAME             READY   STATUS    RESTARTS   AGE
+nginx-rs-7r4rt   1/1     Running   0          24s
+nginx-rs-jjzzt   1/1     Running   0          24s
+nginx-rs-wvbtg   1/1     Running   0          24s
+
+$ kubectl delete rs nginx-rs
+replicaset.apps "nginx-rs" deleted from default namespace
+
+----- Part 3: Deployment (adds rolling updates + rollback on top of ReplicaSet) -----
+$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: nginx-deployment
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      labels:
+        app: nginx
+
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+$ kubectl apply -f deployment.yml
+deployment.apps/nginx-deployment created
+Waiting for deployment "nginx-deployment" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 of 3 updated replicas are available...
+deployment "nginx-deployment" successfully rolled out
+$ kubectl get deploy nginx-deployment && kubectl get rs -l app=nginx && kubectl get pods -l app=nginx
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   3/3     3            3           27s
+NAME                          DESIRED   CURRENT   READY   AGE
+nginx-deployment-569f95f5cb   3         3         3       27s
+NAME                                READY   STATUS    RESTARTS   AGE
+nginx-deployment-569f95f5cb-9cq7g   1/1     Running   0          27s
+nginx-deployment-569f95f5cb-nh2v9   1/1     Running   0          27s
+nginx-deployment-569f95f5cb-wg596   1/1     Running   0          27s
+
+----- Part 4: Rolling Update -- change the image, watch pods replace gradually -----
+$ kubectl set image deployment/nginx-deployment nginx=nginx:1.26
+deployment.apps/nginx-deployment image updated
+Waiting for deployment "nginx-deployment" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 old replicas are pending termination...
+deployment "nginx-deployment" successfully rolled out
+$ kubectl rollout history deployment/nginx-deployment
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+$ kubectl get rs -l app=nginx      # OLD ReplicaSet scaled to 0, NEW one scaled to 3 -- both still exist for rollback
+NAME                          DESIRED   CURRENT   READY   AGE
+nginx-deployment-569f95f5cb   0         0         0       63s
+nginx-deployment-8574879789   3         3         3       23s
+
+----- Part 5: Rollback -- undo the update -----
+$ kubectl rollout undo deployment/nginx-deployment
+Warning: resource deployments/nginx-deployment was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+deployment.apps/nginx-deployment rolled back
+Waiting for deployment spec update to be observed...
+Waiting for deployment "nginx-deployment" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deployment" rollout to finish: 1 old replicas are pending termination...
+deployment "nginx-deployment" successfully rolled out
+$ kubectl describe deployment nginx-deployment | grep Image
+    Image:         nginx:1.25
+
+----- Part 6: Scaling -----
+$ kubectl scale deployment/nginx-deployment --replicas=5
+deployment.apps/nginx-deployment scaled
+$ kubectl get pods -l app=nginx
+NAME                                READY   STATUS    RESTARTS   AGE
+nginx-deployment-569f95f5cb-5nmsw   1/1     Running   0          19s
+nginx-deployment-569f95f5cb-6j79c   1/1     Running   0          5s
+nginx-deployment-569f95f5cb-n962n   1/1     Running   0          5s
+nginx-deployment-569f95f5cb-p6cqb   1/1     Running   0          14s
+nginx-deployment-569f95f5cb-qjg7p   1/1     Running   0          23s
+
+----- Cleanup -----
+$ kubectl delete deployment nginx-deployment
+deployment.apps "nginx-deployment" deleted from default namespace
