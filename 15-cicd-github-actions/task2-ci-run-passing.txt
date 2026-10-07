@@ -1,0 +1,37 @@
+===== Real GitHub Actions run (passing) =====
+
+$ git push origin main      # triggers the workflow automatically
+
+https://github.com/ayushsingh199/devops-homework/actions/runs/37633312666
+
+workflow: Final CI Pipeline
+status: completed | conclusion: success
+event: push
+commit: Add CI/CD & GitHub Actions homework (session 16): real pipeline with test/build/security-check jobs
+
+Test Application     -> completed  success
+    Set up job                     success
+    Checkout source code           success
+    Setup Python                   success
+    Display Python version         success
+    Install dependencies           success
+    Run tests                      success
+    Post Setup Python              success
+    Post Checkout source code      success
+    Complete job                   success
+Security Check       -> completed  success
+    Set up job                     success
+    Checkout source code           success
+    Check for sensitive files      success
+    Post Checkout source code      success
+    Complete job                   success
+Build Application    -> completed  success
+    Set up job                     success
+    Checkout source code           success
+    Setup Python                   success
+    Build application              success
+    Show build output              success
+    Upload build artifact          success
+    Post Setup Python              success
+    Post Checkout source code      success
+    Complete job                   success
