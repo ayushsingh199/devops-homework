@@ -66,7 +66,17 @@ Ready.
 
 ## Task 2: AWS Services Research
 
-Still to come: conceptual writeups of IAM, EC2, S3, VPC, and DynamoDB/RDS — these don't
-need infrastructure, just documentation, and will land as a follow-up commit.
+Conceptual writeups — no infrastructure needed, just documentation:
+
+- [`aws-services/01-iam/README.md`](aws-services/01-iam/README.md) — Users, Groups,
+  Roles, Policies, least privilege
+- [`aws-services/02-ec2/README.md`](aws-services/02-ec2/README.md) — AMI, instance
+  types, key pairs, security groups, EBS, instance lifecycle
+- [`aws-services/03-s3/README.md`](aws-services/03-s3/README.md) — buckets, objects,
+  storage classes, versioning, lifecycle policies, encryption, bucket policies
+- [`aws-services/04-vpc/README.md`](aws-services/04-vpc/README.md) — CIDR, subnets,
+  route tables, Internet/NAT gateways, security groups vs NACLs, public vs private subnets
+- [`aws-services/05-dynamodb-rds/README.md`](aws-services/05-dynamodb-rds/README.md) —
+  DynamoDB (NoSQL, partition/sort keys) vs RDS (relational, Multi-AZ, read replicas)
 
 Screenshot: [`../screenshots/17-terraform-s3.png`](../screenshots/17-terraform-s3.png)
