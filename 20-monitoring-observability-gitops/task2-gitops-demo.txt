@@ -1,0 +1,107 @@
+===== GitOps Demo: Git as source of truth, continuous reconciliation, self-healing =====
+
+$ cat gitops-demo/app/namespace.yaml gitops-demo/app/deployment.yaml gitops-demo/app/service.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitops-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitops-demo
+  namespace: gitops-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gitops-demo
+  template:
+    metadata:
+      labels:
+        app: gitops-demo
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitops-demo
+  namespace: gitops-demo
+spec:
+  selector:
+    app: gitops-demo
+  ports:
+    - port: 80
+      targetPort: 80
+
+$ bash reconciler.sh 5 &      # start the reconciler loop in the background, watching app/ every 5s
+
+----- Full reconciler log for this run -----
+Reconciler watching /Users/ayushsingh/Desktop/devops-homework/20-monitoring-observability-gitops/gitops-demo/app every 5s. Ctrl+C to stop.
+[21:01:01] reconciled:
+    deployment.apps/gitops-demo created
+    service/gitops-demo created
+[21:01:07] in sync, nothing to do
+[21:01:12] in sync, nothing to do
+[21:01:17] in sync, nothing to do
+[21:01:23] reconciled:
+    deployment.apps/gitops-demo configured
+[21:01:29] in sync, nothing to do
+[21:01:34] reconciled:
+    deployment.apps/gitops-demo configured
+
+----- Step-by-step what happened -----
+
+1. Reconciler's FIRST poll applied app/ for the first time:
+   deployment.apps/gitops-demo created, service/gitops-demo created
+   $ kubectl get deployment -n gitops-demo
+   NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+   gitops-demo   2/2     2            2           12s
+
+2. "Git change" (simulated by editing the desired-state file directly -- same effect as a
+   real `git commit && git push` that a repo-watching reconciler would pick up):
+   $ sed -i '' 's/replicas: 2/replicas: 3/' gitops-demo/app/deployment.yaml
+
+3. Reconciler noticed on its next poll (~5s later), reconciled automatically:
+   [21:01:23] reconciled:
+       deployment.apps/gitops-demo configured
+   $ kubectl get deployment -n gitops-demo
+   NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+   gitops-demo   3/3     3            3           25s
+
+4. Manual drift, bypassing Git entirely (simulating someone running kubectl by hand
+   against a GitOps-managed cluster -- exactly the scenario self-healing exists for):
+   $ kubectl scale deployment gitops-demo -n gitops-demo --replicas=1
+   $ kubectl get deployment -n gitops-demo
+   NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+   gitops-demo   3/1     3            3           31s
+
+5. Reconciler noticed the live state (1 replica) no longer matched the desired state in
+   app/deployment.yaml (3 replicas) -- re-applied it automatically, with ZERO human
+   intervention:
+   [21:01:34] reconciled:
+       deployment.apps/gitops-demo configured
+   $ kubectl get deployment -n gitops-demo
+   NAME          READY   UP-TO-DATE   AVAILABLE   AGE
+   gitops-demo   3/3     3            3           39s
+
+----- A real bug hit and fixed before this run -----
+
+First attempt: the reconciler script died silently after its very first iteration.
+Root cause: `kubectl apply -f app/` applies every file in the directory as ONE batch;
+on a truly fresh cluster the Deployment (inside the gitops-demo namespace) and the
+Namespace itself were submitted together, and the Deployment's creation failed because
+the Namespace didn't exist yet at that exact moment within the same batch. The script had
+`set -e`, so that failure killed the whole loop instantly -- a genuinely real kubectl
+apply ordering gotcha, not something specific to GitOps.
+Fix: apply namespace.yaml explicitly first (idempotent on every later loop), then apply
+the rest of app/ as before. See gitops-demo/reconciler.sh for the fixed version.
+
+----- Cleanup -----
+$ kubectl delete namespace gitops-demo
+namespace "gitops-demo" deleted

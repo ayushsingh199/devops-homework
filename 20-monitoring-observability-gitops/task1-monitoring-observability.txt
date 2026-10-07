@@ -1,0 +1,59 @@
+===== Monitoring & Observability: practical demo =====
+
+----- Monitoring: "is the system healthy?" -- metrics-server + kubectl top -----
+pod/mon-demo created
+$ kubectl top nodes
+NAME     CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)   
+colima   785m         39%      1382Mi          47%         
+$ kubectl top pod mon-demo
+NAME       CPU(cores)   MEMORY(bytes)   
+mon-demo   0m           2Mi             
+
+----- Observability signal 1: Metrics -- numbers over time -----
+$ kubectl get --raw "/apis/metrics.k8s.io/v1beta1/pods/default/mon-demo" | python3 -m json.tool
+Error from server (NotFound): the server could not find the requested resource
+Expecting value: line 1 column 1 (char 0)
+
+----- Observability signal 2: Logs -- discrete events -----
+$ kubectl exec mon-demo -- sh -c "for i in 1 2 3; do echo \"[app] handled request \$i\"; done"
+[app] handled request 1
+[app] handled request 2
+[app] handled request 3
+$ kubectl logs mon-demo | tail -5      # nginx's own access/error log stream
+2026/10/07 15:28:29 [notice] 1#1: OS: Linux 6.8.0-117-generic
+2026/10/07 15:28:29 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1024:524288
+2026/10/07 15:28:29 [notice] 1#1: start worker processes
+2026/10/07 15:28:29 [notice] 1#1: start worker process 29
+2026/10/07 15:28:29 [notice] 1#1: start worker process 30
+
+----- Observability signal 3: Traces -- a request's journey across services -----
+(no distributed tracing backend installed here -- see README for why, and what a trace
+ actually looks like conceptually: a single request_id threading through multiple spans,
+ one per service hop, each with its own start/end timestamp.)
+pod "mon-demo" deleted from default namespace
+
+----- (corrected path) Observability signal 1: Metrics via the real metrics API -----
+$ kubectl get --raw "/apis/metrics.k8s.io/v1beta1/namespaces/default/pods/mon-demo2" | python3 -m json.tool
+{
+    "kind": "PodMetrics",
+    "apiVersion": "metrics.k8s.io/v1beta1",
+    "metadata": {
+        "name": "mon-demo2",
+        "namespace": "default",
+        "creationTimestamp": "2026-10-07T15:29:26Z",
+        "labels": {
+            "run": "mon-demo2"
+        }
+    },
+    "timestamp": "2026-10-07T15:29:18Z",
+    "window": "14.736s",
+    "containers": [
+        {
+            "name": "mon-demo2",
+            "usage": {
+                "cpu": "4346566n",
+                "memory": "2968Ki"
+            }
+        }
+    ]
+}
