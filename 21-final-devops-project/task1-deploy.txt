@@ -1,0 +1,42 @@
+===== Final Project: Helm deploy =====
+
+$ docker build -t final-devops-app:local ./application      # (built above, base layers cached from session 17)
+
+$ helm install final-app helm/final-app-chart
+NAME: final-app
+LAST DEPLOYED: Wed Oct  7 21:05:41 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE: None
+Waiting for deployment "final-app" rollout to finish: 0 out of 2 new replicas have been updated...
+Waiting for deployment "final-app" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "final-app" rollout to finish: 1 of 2 updated replicas are available...
+deployment "final-app" successfully rolled out
+
+$ kubectl get pods,svc -l app=final-app
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/final-app-85c99696c9-5mr95   1/1     Running   0          6s
+pod/final-app-85c99696c9-tcxzb   1/1     Running   0          6s
+
+$ kubectl run curltest --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- http://final-app-svc/health
+{
+  "status": "healthy",
+  "timestamp": "2026-10-07T15:35:55.505994Z",
+  "uptime_seconds": 7.79
+}
+pod "curltest" deleted from default namespace
+
+$ kubectl run curltest2 --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- http://final-app-svc/api/status
+{
+  "app": "DevSecOps Dashboard",
+  "platform": "Linux",
+  "python_version": "3.12.15",
+  "status": "running",
+  "timestamp": "2026-10-07T15:35:58.372136Z",
+  "total_requests": 5,
+  "uptime": "00h 00m 10s",
+  "version": "2.0.0"
+}
+pod "curltest2" deleted from default namespace

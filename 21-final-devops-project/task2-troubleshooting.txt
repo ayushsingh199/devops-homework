@@ -1,0 +1,58 @@
+===== Final Troubleshooting Challenge =====
+
+Baseline before breaking anything:
+NAME        READY   UP-TO-DATE   AVAILABLE   AGE
+final-app   2/2     2            2           35s
+NAME                         READY   STATUS    RESTARTS   AGE
+final-app-85c99696c9-5mr95   1/1     Running   0          34s
+final-app-85c99696c9-tcxzb   1/1     Running   0          34s
+
+----- Bug 1: upgrade to a non-existent image tag -----
+$ helm upgrade final-app helm/final-app-chart --set image.tag=v2-broken
+Release "final-app" has been upgraded. Happy Helming!
+NAME: final-app
+LAST DEPLOYED: Wed Oct  7 21:06:19 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 2
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+
+$ kubectl get pods -l app=final-app      # Step 1: OBSERVE
+NAME                         READY   STATUS         RESTARTS   AGE
+final-app-6fcbcdc774-96t8b   0/1     ErrImagePull   0          11s
+final-app-85c99696c9-5mr95   1/1     Running        0          49s
+final-app-85c99696c9-tcxzb   1/1     Running        0          49s
+$ kubectl describe pod final-app-6fcbcdc774-96t8b | tail -10      # Step 2: INVESTIGATE
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age   From               Message
+  ----     ------     ----  ----               -------
+  Normal   Scheduled  10s   default-scheduler  Successfully assigned default/final-app-6fcbcdc774-96t8b to colima
+  Normal   Pulling    7s    kubelet            spec.containers{app}: Pulling image "final-devops-app:v2-broken"
+  Warning  Failed     6s    kubelet            spec.containers{app}: Failed to pull image "final-devops-app:v2-broken": Error response from daemon: pull access denied for final-devops-app, repository does not exist or may require 'docker login'
+  Warning  Failed     6s    kubelet            spec.containers{app}: Error: ErrImagePull
+  Normal   BackOff    6s    kubelet            spec.containers{app}: Back-off pulling image "final-devops-app:v2-broken"
+  Warning  Failed     6s    kubelet            spec.containers{app}: Error: ImagePullBackOff
+
+ROOT CAUSE: "v2-broken" is not a tag that was ever built -- only "local" exists.
+Note also: because the Deployment uses RollingUpdate (the default), the 2 OLD healthy
+pods were NEVER killed -- the app stayed up and serving traffic the entire time this
+was broken. This is the Deployment safety mechanism from Session 10 in action for real.
+
+----- Fix: roll back to the last known-good revision -----
+$ helm rollback final-app 1
+Rollback was a success! Happy Helming!
+deployment "final-app" successfully rolled out
+$ kubectl get pods -l app=final-app      # VERIFY
+NAME                         READY   STATUS        RESTARTS   AGE
+final-app-6fcbcdc774-96t8b   0/1     Terminating   0          23s
+final-app-85c99696c9-5mr95   1/1     Running       0          61s
+final-app-85c99696c9-tcxzb   1/1     Running       0          61s
+$ kubectl run verify1 --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- http://final-app-svc/health
+{
+  "status": "healthy",
+  "timestamp": "2026-10-07T15:36:46.062555Z",
+  "uptime_seconds": 58.69
+}
+pod "verify1" deleted from default namespace
