@@ -1,0 +1,70 @@
+===== Session 14: Kubernetes Troubleshooting Commands =====
+
+----- kubectl get: "what is happening?" -----
+pod/demo-pod created
+$ kubectl get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+demo-pod                    1/1     Running   0          3s
+hpa-demo-84b7f99c9d-c2llx   1/1     Running   0          4m11s
+hpa-demo-84b7f99c9d-c8q5r   1/1     Running   0          4m41s
+hpa-demo-84b7f99c9d-lf26t   1/1     Running   0          4m41s
+hpa-demo-84b7f99c9d-mpxvv   1/1     Running   0          6m42s
+hpa-demo-84b7f99c9d-tcngf   1/1     Running   0          4m41s
+$ kubectl get pods -o wide
+NAME                        READY   STATUS    RESTARTS   AGE     IP           NODE     NOMINATED NODE   READINESS GATES
+demo-pod                    1/1     Running   0          3s      10.42.0.34   colima   <none>           <none>
+hpa-demo-84b7f99c9d-c2llx   1/1     Running   0          4m11s   10.42.0.27   colima   <none>           <none>
+hpa-demo-84b7f99c9d-c8q5r   1/1     Running   0          4m41s   10.42.0.25   colima   <none>           <none>
+hpa-demo-84b7f99c9d-lf26t   1/1     Running   0          4m41s   10.42.0.26   colima   <none>           <none>
+hpa-demo-84b7f99c9d-mpxvv   1/1     Running   0          6m42s   10.42.0.22   colima   <none>           <none>
+hpa-demo-84b7f99c9d-tcngf   1/1     Running   0          4m41s   10.42.0.24   colima   <none>           <none>
+
+----- kubectl describe: "what details can explain the problem?" -----
+$ kubectl describe pod demo-pod | tail -12
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  2s    default-scheduler  Successfully assigned default/demo-pod to colima
+  Normal  Pulled     1s    kubelet            spec.containers{demo-pod}: Container image "nginx:1.27" already present on machine and can be accessed by the pod
+  Normal  Created    1s    kubelet            spec.containers{demo-pod}: Container created
+  Normal  Started    1s    kubelet            spec.containers{demo-pod}: Container started
+
+----- kubectl logs: "what is the application saying?" -----
+$ kubectl logs demo-pod | tail -8
+2026/10/07 13:49:49 [notice] 1#1: using the "epoll" event method
+2026/10/07 13:49:49 [notice] 1#1: nginx/1.27.5
+2026/10/07 13:49:49 [notice] 1#1: built by gcc 12.2.0 (Debian 12.2.0-14) 
+2026/10/07 13:49:49 [notice] 1#1: OS: Linux 6.8.0-117-generic
+2026/10/07 13:49:49 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1024:524288
+2026/10/07 13:49:49 [notice] 1#1: start worker processes
+2026/10/07 13:49:49 [notice] 1#1: start worker process 29
+2026/10/07 13:49:49 [notice] 1#1: start worker process 30
+
+----- kubectl exec: "what can I see from inside the container?" -----
+$ kubectl exec demo-pod -- nginx -v
+nginx version: nginx/1.27.5
+$ kubectl exec demo-pod -- cat /etc/nginx/conf.d/default.conf | head -5
+server {
+    listen       80;
+    listen  [::]:80;
+    server_name  localhost;
+
+
+----- kubectl get events: "what did Kubernetes try, and what happened?" -----
+$ kubectl get events --field-selector involvedObject.name=demo-pod
+LAST SEEN   TYPE     REASON      OBJECT         MESSAGE
+19s         Normal   Scheduled   pod/demo-pod   Successfully assigned default/demo-pod to colima
+19s         Normal   Pulled      pod/demo-pod   Container image "nginx:1.27" already present on machine and can be accessed by the pod
+19s         Normal   Created     pod/demo-pod   Container created
+19s         Normal   Started     pod/demo-pod   Container started
+17s         Normal   Killing     pod/demo-pod   Stopping container demo-pod
+3s          Normal   Scheduled   pod/demo-pod   Successfully assigned default/demo-pod to colima
+2s          Normal   Pulled      pod/demo-pod   Container image "nginx:1.27" already present on machine and can be accessed by the pod
+2s          Normal   Created     pod/demo-pod   Container created
+2s          Normal   Started     pod/demo-pod   Container started
+pod "demo-pod" deleted from default namespace

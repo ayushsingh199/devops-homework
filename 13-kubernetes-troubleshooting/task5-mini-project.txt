@@ -1,0 +1,46 @@
+===== Mini Project: Kubernetes Troubleshooting Challenge =====
+
+----- 1/2/3/4: deploy, observe, check service & endpoints -----
+deployment.apps/troubleshooting-app created
+service/troubleshooting-service created
+Waiting for deployment "troubleshooting-app" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "troubleshooting-app" rollout to finish: 1 of 2 updated replicas are available...
+deployment "troubleshooting-app" successfully rolled out
+$ kubectl get pods && kubectl get service troubleshooting-service
+NAME                                   READY   STATUS    RESTARTS   AGE
+troubleshooting-app-5fbf788f8b-j8nvp   1/1     Running   0          2s
+troubleshooting-app-5fbf788f8b-scx8m   1/1     Running   0          2s
+NAME                      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+troubleshooting-service   ClusterIP   10.43.63.133   <none>        80/TCP    2s
+$ kubectl get endpoints troubleshooting-service      # real Pod IPs -- working baseline
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                      ENDPOINTS                     AGE
+troubleshooting-service   10.42.0.46:80,10.42.0.47:80   2s
+$ kubectl exec troubleshooting-app-5fbf788f8b-j8nvp -- sh -c 'wget -qO- localhost' | grep -i title
+sh: 1: wget: not found
+nginx version: nginx/1.27.5
+
+----- 5/6/7: a broken Pod with a real question set -----
+$ cat mini-project/broken-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: project-broken-pod
+spec:
+  containers:
+    - name: app
+      image: myregistry.example.com/does-not-exist:v1
+pod/project-broken-pod created
+$ kubectl get pod project-broken-pod
+NAME                 READY   STATUS             RESTARTS   AGE
+project-broken-pod   0/1     ImagePullBackOff   0          10s
+$ kubectl describe pod project-broken-pod | tail -8
+  Type     Reason     Age              From               Message
+  ----     ------     ----             ----               -------
+  Normal   Scheduled  10s              default-scheduler  Successfully assigned default/project-broken-pod to colima
+  Normal   Pulling    10s              kubelet            spec.containers{app}: Pulling image "myregistry.example.com/does-not-exist:v1"
+  Warning  Failed     10s              kubelet            spec.containers{app}: Failed to pull image "myregistry.example.com/does-not-exist:v1": Error response from daemon: failed to resolve reference "myregistry.example.com/does-not-exist:v1": failed to do request: Head "https://myregistry.example.com/v2/does-not-exist/manifests/v1": dial tcp: lookup myregistry.example.com on 192.168.5.1:53: no such host
+  Warning  Failed     10s              kubelet            spec.containers{app}: Error: ErrImagePull
+  Normal   BackOff    8s (x2 over 9s)  kubelet            spec.containers{app}: Back-off pulling image "myregistry.example.com/does-not-exist:v1"
+  Warning  Failed     8s (x2 over 9s)  kubelet            spec.containers{app}: Error: ImagePullBackOff
+pod "project-broken-pod" deleted from default namespace

@@ -1,0 +1,85 @@
+===== Scenario: Service selector / DNS mismatch =====
+
+$ cat 09-service-dns-troubleshooting/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+deployment.apps/web created
+Waiting for deployment "web" rollout to finish: 0 out of 2 new replicas have been updated...
+Waiting for deployment "web" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "web" rollout to finish: 1 of 2 updated replicas are available...
+deployment "web" successfully rolled out
+
+$ cat 09-service-dns-troubleshooting/broken-service.yaml   (selector: app: web-ahsgdf -- typo'd, does not match any Pod label)
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  selector:
+    app: web-ahsgdf
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+service/web-service created
+
+$ kubectl get pods --show-labels | grep web      # real Pod label is app=web
+web-7fc7749b56-6t54d   1/1     Running   0          4s    app=web,pod-template-hash=7fc7749b56
+web-7fc7749b56-n6cmv   1/1     Running   0          4s    app=web,pod-template-hash=7fc7749b56
+$ kubectl describe service web-service | grep -i selector
+Selector:                 app=web-ahsgdf
+$ kubectl get endpoints web-service      # EMPTY -- selector matches zero pods
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME          ENDPOINTS   AGE
+web-service   <none>      2s
+$ kubectl run dns-check --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- --timeout=3 web-service
+wget: can't connect to remote host (10.43.8.113): Connection refused
+pod "dns-check" deleted from default namespace
+pod default/dns-check terminated (Error)
+(DNS resolves web-service to a real ClusterIP just fine -- the problem isn't DNS at all,
+ it's that the Service has NO endpoints to forward to -- so the connection is refused
+ immediately, with no DNAT target for iptables to rewrite the destination to)
+
+ROOT CAUSE: Service selector (app=web-ahsgdf) does not match the Deployment's Pod label (app=web)
+-- a typo. Kubernetes doesn't validate that a Service's selector matches anything at creation
+time, so this fails silently until someone actually tries to connect.
+
+----- FIX: match the selector to the real Pod label -----
+$ cat 09-service-dns-troubleshooting/fixed-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+service/web-service configured
+$ kubectl get endpoints web-service      # VERIFY: now has real Pod IPs
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME          ENDPOINTS                     AGE
+web-service   10.42.0.42:80,10.42.0.43:80   8s
+$ kubectl run dns-check2 --rm -i --restart=Never --image=busybox:1.36 -- wget -qO- --timeout=3 web-service
+<title>Welcome to nginx!</title>
+deployment.apps "web" deleted from default namespace
+service "web-service" deleted from default namespace

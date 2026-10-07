@@ -1,0 +1,99 @@
+===== Scenario: ImagePullBackOff =====
+
+$ cat 07-imagepullbackoff/broken-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-demo
+spec:
+  containers:
+    - name: app
+      image: nginx:this-image-does-not-exist
+pod/image-demo created
+
+$ kubectl get pod image-demo
+NAME         READY   STATUS         RESTARTS   AGE
+image-demo   0/1     ErrImagePull   0          10s
+$ kubectl describe pod image-demo | tail -10      # Events show the real error
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age   From               Message
+  ----     ------     ----  ----               -------
+  Normal   Scheduled  10s   default-scheduler  Successfully assigned default/image-demo to colima
+  Normal   Pulling    9s    kubelet            spec.containers{app}: Pulling image "nginx:this-image-does-not-exist"
+  Warning  Failed     8s    kubelet            spec.containers{app}: Failed to pull image "nginx:this-image-does-not-exist": Error response from daemon: failed to resolve reference "docker.io/library/nginx:this-image-does-not-exist": docker.io/library/nginx:this-image-does-not-exist: not found
+  Warning  Failed     8s    kubelet            spec.containers{app}: Error: ErrImagePull
+  Normal   BackOff    7s    kubelet            spec.containers{app}: Back-off pulling image "nginx:this-image-does-not-exist"
+  Warning  Failed     7s    kubelet            spec.containers{app}: Error: ImagePullBackOff
+
+ROOT CAUSE: tag "this-image-does-not-exist" does not exist in the nginx repo on Docker Hub.
+Kubernetes keeps retrying the pull with exponential backoff -- it cannot distinguish
+"this will never exist" from "registry is just slow", so it never gives up on its own.
+pod "image-demo" deleted from default namespace
+
+----- FIX: use a tag that actually exists -----
+$ cat 07-imagepullbackoff/fixed-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-demo
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27
+pod/image-demo created
+pod/image-demo condition met
+$ kubectl get pod image-demo      # VERIFY
+NAME         READY   STATUS    RESTARTS   AGE
+image-demo   1/1     Running   0          3s
+pod "image-demo" deleted from default namespace
+
+===== Scenario: Pending Pod =====
+
+$ cat 08-pending-pods/broken-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pending-demo
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: node-that-does-not-exist
+  containers:
+    - name: nginx
+      image: nginx:1.27
+pod/pending-demo created
+
+$ kubectl get pod pending-demo
+NAME           READY   STATUS    RESTARTS   AGE
+pending-demo   0/1     Pending   0          5s
+$ kubectl describe pod pending-demo | tail -8      # Events show WHY the scheduler can't place it
+QoS Class:                   BestEffort
+Node-Selectors:              kubernetes.io/hostname=node-that-does-not-exist
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  5s    default-scheduler  0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+
+ROOT CAUSE: nodeSelector demands a node labeled kubernetes.io/hostname=node-that-does-not-exist.
+No node in this cluster carries that label (there is only one node, named "colima") -- the
+scheduler has nowhere valid to place the Pod, so it stays Pending forever.
+pod "pending-demo" deleted from default namespace
+
+----- FIX: drop the impossible constraint -----
+$ cat 08-pending-pods/fixed-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pending-demo
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+pod/pending-demo created
+pod/pending-demo condition met
+$ kubectl get pod pending-demo      # VERIFY
+NAME           READY   STATUS    RESTARTS   AGE
+pending-demo   1/1     Running   0          2s
+pod "pending-demo" deleted from default namespace

@@ -1,0 +1,71 @@
+===== Scenario: CrashLoopBackOff =====
+
+$ cat 06-crashloopbackoff/broken-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-demo
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Application starting..."
+          echo "Something went wrong!"
+          exit 1
+pod/crash-demo created
+
+$ kubectl logs crash-demo      # right after the first exit, before it's pruned
+Application starting...
+Something went wrong!
+
+$ kubectl get pod crash-demo      # Question 1: what is the status, after a few restart cycles?
+NAME         READY   STATUS   RESTARTS      AGE
+crash-demo   0/1     Error    3 (33s ago)   48s
+$ kubectl describe pod crash-demo | tail -14      # Events confirm BackOff + the exit code
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  48s                default-scheduler  Successfully assigned default/crash-demo to colima
+  Normal   Pulled     11s (x4 over 48s)  kubelet            spec.containers{app}: Container image "busybox:1.36" already present on machine and can be accessed by the pod
+  Normal   Created    10s (x4 over 48s)  kubelet            spec.containers{app}: Container created
+  Normal   Started    10s (x4 over 48s)  kubelet            spec.containers{app}: Container started
+  Warning  BackOff    10s (x3 over 45s)  kubelet            spec.containers{app}: Back-off restarting failed container app in pod crash-demo_default(0bb2f373-68d6-4a22-a258-f226e2a73964)
+
+ROOT CAUSE: the container's own command runs "exit 1" -- the process deliberately terminates,
+the container has nothing left to do, kubelet restarts it, it exits again -- repeat, with an
+exponential backoff delay between each restart (10s, 20s, 40s... capped at 5min) -- this IS
+CrashLoopBackOff: the main process keeps exiting, not that something external killed it.
+pod "crash-demo" deleted from default namespace
+
+----- FIX: the real process has to stay running -----
+$ cat 06-crashloopbackoff/fixed-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-demo
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Application starting..."
+          echo "Application is healthy"
+          sleep 3600
+pod/crash-demo created
+$ kubectl get pod crash-demo      # VERIFY: Running, 0 restarts, stays that way
+NAME         READY   STATUS    RESTARTS   AGE
+crash-demo   1/1     Running   0          5s
+pod "crash-demo" deleted from default namespace

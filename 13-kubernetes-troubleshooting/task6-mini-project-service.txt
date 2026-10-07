@@ -1,0 +1,39 @@
+
+----- 8/9: break the Service selector on purpose -----
+$ cat mini-project/broken-service.yaml   (selector changed to app: wrong-app)
+apiVersion: v1
+kind: Service
+metadata:
+  name: troubleshooting-service
+spec:
+  selector:
+    app: wrong-app
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+service/troubleshooting-service configured
+$ kubectl get service troubleshooting-service
+NAME                      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+troubleshooting-service   ClusterIP   10.43.63.133   <none>        80/TCP    27s
+$ kubectl get endpoints troubleshooting-service
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                      ENDPOINTS   AGE
+troubleshooting-service   <none>      27s
+
+$ kubectl get pods --show-labels | grep troubleshooting-app
+troubleshooting-app-5fbf788f8b-j8nvp   1/1     Running   0          27s   app=troubleshooting-app,pod-template-hash=5fbf788f8b
+troubleshooting-app-5fbf788f8b-scx8m   1/1     Running   0          27s   app=troubleshooting-app,pod-template-hash=5fbf788f8b
+$ kubectl describe service troubleshooting-service | grep -i selector
+Selector:                 app=wrong-app
+(Pod label is app=troubleshooting-app, Service selector asks for app=wrong-app -- mismatch
+ found by comparing the two directly, exactly as Task 9 describes)
+
+----- Fix and verify -----
+service/troubleshooting-service configured
+$ kubectl get endpoints troubleshooting-service      # back to real Pod IPs
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                      ENDPOINTS                     AGE
+troubleshooting-service   10.42.0.46:80,10.42.0.47:80   30s
+deployment.apps "troubleshooting-app" deleted from default namespace
+service "troubleshooting-service" deleted from default namespace

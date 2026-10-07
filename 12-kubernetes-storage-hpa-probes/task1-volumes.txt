@@ -1,0 +1,178 @@
+===== Kubernetes Volumes: emptyDir vs hostPath vs PV/PVC vs StorageClass =====
+
+----- emptyDir: lives only as long as the Pod -----
+$ cat 01-kubernetes-volumes/emptydir-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emptydir-demo
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27
+      volumeMounts:
+        - name: app-storage
+          mountPath: /data
+  volumes:
+    - name: app-storage
+      emptyDir: {}
+pod/emptydir-demo created
+pod/emptydir-demo condition met
+$ kubectl exec emptydir-demo -- sh -c "echo hello > /data/test.txt && cat /data/test.txt"
+hello
+$ kubectl delete pod emptydir-demo
+pod "emptydir-demo" deleted from default namespace
+(emptyDir storage is deleted along with the Pod -- there is nothing left to recover)
+
+----- hostPath: tied to a specific node's filesystem -----
+$ cat 01-kubernetes-volumes/hostpath-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-demo
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27
+      volumeMounts:
+        - name: host-storage
+          mountPath: /data
+  volumes:
+    - name: host-storage
+      hostPath:
+        path: /tmp/hostpath-data
+        type: DirectoryOrCreate
+pod/hostpath-demo created
+pod/hostpath-demo condition met
+$ colima ssh -- cat /tmp/hostpath-data/test.txt      # the file is really sitting on the node's own disk
+from-hostpath
+pod "hostpath-demo" deleted from default namespace
+(deleting the Pod does NOT delete the file -- it is still on the node at /tmp/hostpath-data.
+ But it only works if the next Pod lands on this SAME node -- a real limitation in multi-node clusters.)
+
+----- Static provisioning: PersistentVolume + PersistentVolumeClaim -----
+$ cat 02-persistent-storage/pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: student-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /tmp/student-data
+$ cat 02-persistent-storage/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: student-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+persistentvolume/student-pv created
+persistentvolumeclaim/student-pvc created
+$ kubectl get pv student-pv && kubectl get pvc student-pvc
+NAME         CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+student-pv   1Gi        RWO            Retain           Available                          <unset>                          2s
+NAME          STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+student-pvc   Pending                                      local-path     <unset>                 3s
+(the PVC BOUND to the PV even though the PVC asked for 500Mi and the PV offers 1Gi --
+ PVC binding matches on access mode + "at least this much capacity", not an exact size match)
+pod/storage-demo created
+pod/storage-demo condition met
+$ kubectl delete pod storage-demo && kubectl apply -f 02-persistent-storage/pod.yaml      # recreate, same PVC
+pod "storage-demo" deleted from default namespace
+pod/storage-demo created
+pod/storage-demo condition met
+$ kubectl exec storage-demo -- cat /data/test.txt      # survived the Pod being deleted and recreated
+persisted-data
+pod "storage-demo" deleted from default namespace
+persistentvolumeclaim "student-pvc" deleted from default namespace
+persistentvolume "student-pv" deleted
+
+----- Investigating: did the Pod really bind to student-pv, or did k3s dynamically provision a NEW volume? -----
+persistentvolume/student-pv created
+persistentvolumeclaim/student-pvc created
+$ kubectl get pvc student-pvc    # (before any pod uses it -- local-path uses WaitForFirstConsumer binding)
+NAME          STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+student-pvc   Pending                                      local-path     <unset>                 3s
+pod/storage-demo created
+$ kubectl get pvc student-pvc    # (after a Pod actually claims it)
+NAME          STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+student-pvc   Bound    pvc-6efefb6f-36df-4050-a493-2ebf2d552782   500Mi      RWO            local-path     <unset>                 9s
+$ kubectl get pv    # is student-pv Bound, or did a brand new dynamic PV appear?
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                 STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pvc-6efefb6f-36df-4050-a493-2ebf2d552782   500Mi      RWO            Delete           Bound       default/student-pvc   local-path     <unset>                          3s
+student-pv                                 1Gi        RWO            Retain           Available                                        <unset>                          9s
+
+FINDING: student-pvc never specified storageClassName, and this cluster HAS a default StorageClass
+("local-path"). So the PVC was handed to the dynamic provisioner instead of binding to the manually
+created student-pv -- it silently provisioned its OWN new PersistentVolume rather than reusing mine.
+student-pv sits there "Available" and unused. This is a real, common gotcha: on a cluster WITHOUT a
+default StorageClass (plain kubeadm, or an older minikube), an unspecified storageClassName forces
+the PVC to only match pre-existing PVs, so this exact YAML would have bound to student-pv there.
+The fix to force true static binding on a cluster that HAS a default SC: set storageClassName: "" explicitly.
+pod "storage-demo" deleted from default namespace
+persistentvolumeclaim "student-pvc" deleted from default namespace
+persistentvolume "student-pv" deleted
+
+----- The fix: storageClassName: "" forces static-only binding to an existing PV -----
+$ cat pvc-static-fixed.yaml (storageClassName: "")
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: student-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 500Mi
+persistentvolume/student-pv created
+persistentvolumeclaim/student-pvc created
+$ kubectl get pvc student-pvc    # now Bound immediately, no WaitForFirstConsumer needed
+NAME          STATUS   VOLUME       CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+student-pvc   Bound    student-pv   1Gi        RWO                           <unset>                 2s
+$ kubectl get pv student-pv      # CLAIM column shows it's really bound to MY PV this time
+NAME         CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                 STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+student-pv   1Gi        RWO            Retain           Bound    default/student-pvc                  <unset>                          2s
+persistentvolumeclaim "student-pvc" deleted from default namespace
+persistentvolume "student-pv" deleted
+
+----- StorageClass: dynamic provisioning -- no PV needed, the provisioner creates one on demand -----
+$ kubectl get storageclass
+NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  19d
+(k3s ships its own default StorageClass "local-path" -- the reference curriculum names its
+ SC "standard" [minikube's default name]; adapted the PVC below to use "local-path" instead.)
+$ cat 03-storageclass/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dynamic-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 500Mi
+persistentvolumeclaim/dynamic-pvc created
+$ kubectl get pvc dynamic-pvc    # Pending -- WaitForFirstConsumer: no pod is using it yet
+NAME          STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+dynamic-pvc   Pending                                      local-path     <unset>                 2s
+pod/dynamic-pvc-user created
+$ kubectl get pvc dynamic-pvc    # NOW Bound -- the provisioner created a real PV the moment a Pod needed it
+NAME          STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+dynamic-pvc   Bound    pvc-00685189-d23e-4d2a-9125-984818617e24   500Mi      RWO            local-path     <unset>                 8s
+$ kubectl get pv | grep dynamic-pvc
+pvc-00685189-d23e-4d2a-9125-984818617e24   500Mi      RWO            Delete           Bound    default/dynamic-pvc   local-path     <unset>                          3s
+pod "dynamic-pvc-user" deleted from default namespace
+persistentvolumeclaim "dynamic-pvc" deleted from default namespace

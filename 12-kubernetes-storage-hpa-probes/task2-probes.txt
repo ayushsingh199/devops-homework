@@ -1,0 +1,105 @@
+===== Kubernetes Probes: Startup, Readiness, Liveness =====
+
+----- Liveness probe: healthy pod, probe keeps passing -----
+$ cat 05-probes/liveness.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-demo
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 2
+        failureThreshold: 3
+pod/liveness-demo created
+$ kubectl get pod liveness-demo      # RESTARTS stays 0 -- probe keeps succeeding against "/"
+NAME            READY   STATUS    RESTARTS   AGE
+liveness-demo   1/1     Running   0          10s
+pod "liveness-demo" deleted from default namespace
+
+----- Readiness probe: a BROKEN probe path (deliberately), to show the real effect -----
+$ cat 05-probes/readiness.yaml   (path set to /does-not-exist on purpose)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-demo
+  labels:
+    app: readiness-demo
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+      readinessProbe:
+        httpGet:
+          path: /does-not-exist
+          port: 80
+        initialDelaySeconds: 5
+        periodSeconds: 5
+pod/readiness-demo created
+$ kubectl get pod readiness-demo      # STATUS stays Running, but READY is 0/1 -- NOT restarted
+NAME             READY   STATUS    RESTARTS   AGE
+readiness-demo   0/1     Running   0          10s
+$ kubectl describe pod readiness-demo | grep -A3 "Readiness:"
+    Readiness:      http-get http://:80/does-not-exist delay=5s timeout=1s period=5s successThreshold=1 failureThreshold=3
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-b7s7s (ro)
+$ kubectl expose pod readiness-demo --port=80 --name=readiness-demo-svc
+service/readiness-demo-svc exposed
+$ kubectl get endpoints readiness-demo-svc      # EMPTY -- a failing readiness probe pulls the pod out of EVERY Service
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                 ENDPOINTS   AGE
+readiness-demo-svc               3s
+service "readiness-demo-svc" deleted from default namespace
+pod "readiness-demo" deleted from default namespace
+
+----- Startup probe: gates liveness/readiness until the app has actually finished starting -----
+$ cat 05-probes/startup.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: startup-demo
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+      startupProbe:
+        httpGet:
+          path: /
+          port: 80
+        failureThreshold: 30
+        periodSeconds: 2
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 80
+        periodSeconds: 5
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 80
+        periodSeconds: 5
+pod/startup-demo created
+$ kubectl describe pod startup-demo | grep -A2 "^Events:" 
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  3s    default-scheduler  Successfully assigned default/startup-demo to colima
+  Normal  Pulled     2s    kubelet            spec.containers{nginx}: Container image "nginx:1.27" already present on machine and can be accessed by the pod
+  Normal  Created    2s    kubelet            spec.containers{nginx}: Container created
+  Normal  Started    2s    kubelet            spec.containers{nginx}: Container started
+pod "startup-demo" deleted from default namespace

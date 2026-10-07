@@ -1,0 +1,99 @@
+(image pull for registry.k8s.io/hpa-example took ~90s the first time -- cached from here on)
+$ kubectl get hpa hpa-demo
+NAME       REFERENCE             TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: <unknown>/50%   1         5         1          91s
+$ kubectl top pods -l app=hpa-demo
+error: metrics not available yet
+
+----- Launch a load generator inside the cluster to drive real CPU load -----
+$ kubectl run load-generator --image=busybox:1.36 --restart=Never -- /bin/sh -c "while true; do wget -q -O- http://hpa-demo-service; done"
+pod/load-generator created
+
+----- Watching the HPA react (polling every 20s) -----
+--- t+20s ---
+NAME       REFERENCE             TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: <unknown>/50%   1         5         1          100s
+pod count: 1
+--- t+40s ---
+NAME       REFERENCE             TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: <unknown>/50%   1         5         1          2m
+pod count: 1
+--- t+60s ---
+NAME       REFERENCE             TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 200%/50%   1         5         4          2m21s
+pod count: 4
+--- t+80s ---
+NAME       REFERENCE             TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 68%/50%   1         5         4          2m41s
+pod count: 5
+
+--- reached max replicas ---
+NAME       REFERENCE             TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 50%/50%   1         5         5          2m58s
+NAME                        READY   STATUS    RESTARTS   AGE
+hpa-demo-84b7f99c9d-c2llx   1/1     Running   0          27s
+hpa-demo-84b7f99c9d-c8q5r   1/1     Running   0          57s
+hpa-demo-84b7f99c9d-lf26t   1/1     Running   0          57s
+hpa-demo-84b7f99c9d-mpxvv   1/1     Running   0          2m58s
+hpa-demo-84b7f99c9d-tcngf   1/1     Running   0          57s
+
+----- Stop the load, watch the HPA scale back down -----
+$ kubectl delete pod load-generator
+pod "load-generator" deleted from default namespace
+--- t+100s ---
+NAME       REFERENCE             TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 50%/50%   1         5         5          3m1s
+pod count: 5
+--- t+120s ---
+NAME       REFERENCE             TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 42%/50%   1         5         5          3m21s
+pod count: 5
+--- t+140s ---
+NAME       REFERENCE             TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 41%/50%   1         5         5          3m41s
+pod count: 5
+--- t+160s ---
+NAME       REFERENCE             TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 26%/50%   1         5         5          4m2s
+pod count: 5
+--- t+180s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         5          4m22s
+pod count: 5
+--- t+200s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         5          4m43s
+pod count: 5
+--- t+220s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         5          5m3s
+pod count: 5
+--- t+240s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         5          5m23s
+pod count: 5
+--- t+260s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         5          5m43s
+pod count: 5
+--- t+280s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         5          6m3s
+pod count: 5
+--- t+300s ---
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 2%/50%   1         5         5          6m24s
+pod count: 5
+
+$ kubectl get hpa hpa-demo      # fully back down after the 5-minute stabilization window
+NAME       REFERENCE             TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+hpa-demo   Deployment/hpa-demo   cpu: 1%/50%   1         5         1          9m44s
+NAME                        READY   STATUS    RESTARTS   AGE
+hpa-demo-84b7f99c9d-tcngf   1/1     Running   0          7m43s
+
+(scale-up took ~60s; scale-down took ~8 minutes due to the default 5-minute stabilization
+ window plus metrics-scrape lag -- an intentional asymmetry: Kubernetes scales out fast to
+ protect availability, but scales in cautiously to avoid flapping.)
+deployment.apps "hpa-demo" deleted from default namespace
+service "hpa-demo-service" deleted from default namespace
+horizontalpodautoscaler.autoscaling "hpa-demo" deleted from default namespace
