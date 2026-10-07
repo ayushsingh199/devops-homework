@@ -1,0 +1,14 @@
+===== Real GitHub Actions run (FAILING, on purpose) =====
+
+https://github.com/ayushsingh199/devops-homework/actions/runs/37633587986
+
+status: completed | conclusion: failure
+commit: Session 16: intentionally break calculator.add() to demonstrate CI failure gating
+
+Test Application     -> completed  failure
+Build Application    -> completed  skipped
+Security Check       -> completed  skipped
+
+(build and security-check never ran at all -- "needs: test" held them back
+ because the test job failed. This is the whole point of job dependencies:
+ a broken build never reaches the artifact/deploy stage.)

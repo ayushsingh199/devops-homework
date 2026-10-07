@@ -1,7 +1,7 @@
 import re
 
 def add(a, b):
-    return a + b + 1  # BUG: intentionally broken for the homework failure scenario
+    return a + b
 
 
 def subtract(a, b):
