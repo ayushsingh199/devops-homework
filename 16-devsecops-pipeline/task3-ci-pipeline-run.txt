@@ -1,0 +1,51 @@
+===== Real GitHub Actions run: full DevSecOps pipeline =====
+
+https://github.com/ayushsingh199/devops-homework/actions/runs/37634912118
+
+Status: Success
+Total duration: 3m 47s
+Artifacts: 1
+
+Job-by-job results:
+  Unit Tests              -> success   (11s)
+  SAST - CodeQL           -> success   (1m 6s)
+  SCA - Dependency Scan   -> success   (14s)
+  Secret Scanning - Gitleaks -> success (12s)
+  Docker Build            -> success   (17s)
+  Image Scan - Trivy      -> success   (32s)
+  Push Image to GHCR      -> success   (32s)
+  Deploy to Kubernetes    -> success   (1m 5s)
+
+===== A real failure hit first, diagnosed, and fixed =====
+
+First attempt: https://github.com/ayushsingh199/devops-homework/actions/runs/37634246273
+  Unit Tests, SAST, SCA, Secret Scanning, Docker Build -> all succeeded
+  Image Scan - Trivy -> FAILED in 3s (not a vulnerability finding -- a setup error)
+  Push Image to GHCR, Deploy to Kubernetes -> skipped (blocked by needs: image-scan)
+
+Annotation on the failed job:
+  "Unable to resolve action `aquasecurity/trivy-action@0.28.0`, unable to find version `0.28.0`"
+
+Root cause: aquasecurity/trivy-action's real git tags are v-prefixed (v0.28.0, v0.36.0, ...),
+not bare semver. Confirmed via the GitHub API:
+  $ curl -s https://api.github.com/repos/aquasecurity/trivy-action/tags
+  v0.36.0, v0.35.0, v0.34.0, ... v0.28.0   <- all v-prefixed
+
+Fix: repointed the workflow to aquasecurity/trivy-action@v0.36.0, committed, pushed.
+
+Second finding, also real: the fix commit alone did NOT trigger a new run -- the workflow's
+`paths: 16-devsecops-pipeline/**` filter only reacts to pushes touching that folder, and the
+fix only touched .github/workflows/session17-devsecops.yml. Writing this topic's README (which
+lives inside 16-devsecops-pipeline/) is what re-triggered the next (successful) run.
+
+===== Notes on what each security job actually found =====
+
+- SAST (CodeQL) and SCA (pip-audit): no findings -- a small Flask app with one pinned
+  dependency (Flask==3.1.3) and straightforward route handlers.
+- Secret Scanning (gitleaks): no leaked credentials in the git history for this path.
+- Image Scan (Trivy): configured with `exit-code: 0` -- informational report against
+  HIGH/CRITICAL severities in the python:3.12-slim base image's OS packages, matching the
+  reference curriculum's intent (visible report, not a hard gate at this stage). The run
+  succeeded; GitHub only shows the actual vulnerability table to signed-in viewers, so the
+  specific CVE list isn't reproducible here, but the job's own exit code (and therefore the
+  pipeline's progression to push+deploy) is real, verifiable evidence it ran to completion.
