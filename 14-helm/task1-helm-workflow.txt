@@ -1,0 +1,198 @@
+===== Helm: full install -> upgrade -> rollback workflow =====
+
+$ helm lint notes-chart
+==> Linting notes-chart
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+
+$ helm template notes-dev notes-chart | head -20
+---
+# Source: notes-chart/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notes-dev-config
+data:
+  APP_NAME: "notes-app"
+  ENVIRONMENT: "development"
+
+---
+# Source: notes-chart/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-dev-svc
+spec:
+  type: NodePort
+  selector:
+    app: notes-dev
+
+----- helm install -----
+$ helm install notes-dev notes-chart
+NAME: notes-dev
+LAST DEPLOYED: Wed Oct  7 19:27:20 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+TEST SUITE: None
+Waiting for deployment "notes-dev-deploy" rollout to finish: 0 of 1 updated replicas are available...
+deployment "notes-dev-deploy" successfully rolled out
+
+$ helm list
+NAME     	NAMESPACE	REVISION	UPDATED                             	STATUS  	CHART            	APP VERSION
+notes-dev	default  	1       	2026-10-07 19:27:20.397763 +0530 IST	deployed	notes-chart-0.1.0	1.0        
+$ helm status notes-dev
+NAME: notes-dev
+LAST DEPLOYED: Wed Oct  7 19:27:20 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+RESOURCES:
+==> v1/ConfigMap
+NAME               DATA   AGE
+notes-dev-config   2      36s
+
+==> v1/Service
+NAME            TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+notes-dev-svc   NodePort   10.43.187.173   <none>        80:30090/TCP   36s
+
+==> v1/Deployment
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+notes-dev-deploy   1/1     1            1           36s
+
+==> v1/Pod(related)
+NAME                                READY   STATUS    RESTARTS   AGE
+notes-dev-deploy-578b55fc88-r4tl5   1/1     Running   0          36s
+
+
+TEST SUITE: None
+$ kubectl get pods,svc,configmap -l app=notes-dev 2>/dev/null; kubectl get pods,svc,cm | grep notes-dev
+pod/notes-dev-deploy-578b55fc88-r4tl5   1/1     Running   0          36s
+service/notes-dev-svc   NodePort    10.43.187.173   <none>        80:30090/TCP   36s
+configmap/notes-dev-config   2      36s
+
+----- helm upgrade (to production values) -----
+$ helm upgrade notes-dev notes-chart -f notes-chart/values-prod.yaml
+Release "notes-dev" has been upgraded. Happy Helming!
+NAME: notes-dev
+LAST DEPLOYED: Wed Oct  7 19:28:06 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 2
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 old replicas are pending termination...
+deployment "notes-dev-deploy" successfully rolled out
+$ kubectl get pods | grep notes-dev      # VERIFY: 3 pods now
+notes-dev-deploy-578b55fc88-r4tl5   1/1     Terminating   0          90s
+notes-dev-deploy-57c655ccc5-24mz7   1/1     Running       0          44s
+notes-dev-deploy-57c655ccc5-khncz   1/1     Running       0          5s
+notes-dev-deploy-57c655ccc5-txkq6   1/1     Running       0          2s
+$ helm get values notes-dev
+USER-SUPPLIED VALUES:
+app:
+  environment: production
+  name: notes-app
+image:
+  repository: nginx
+  tag: "1.25"
+replicaCount: 3
+service:
+  nodePort: 30090
+  port: 80
+
+----- helm history -----
+$ helm history notes-dev
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 19:27:20 2026	superseded	notes-chart-0.1.0	1.0        	Install complete
+2       	Wed Oct  7 19:28:06 2026	deployed  	notes-chart-0.1.0	1.0        	Upgrade complete
+
+----- Simulate a bad upgrade -----
+$ helm upgrade notes-dev notes-chart --set image.tag=broken-tag-does-not-exist
+Release "notes-dev" has been upgraded. Happy Helming!
+NAME: notes-dev
+LAST DEPLOYED: Wed Oct  7 19:28:50 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 3
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+$ kubectl get pods | grep notes-dev      # a broken pod should appear
+notes-dev-deploy-57c655ccc5-24mz7   1/1     Running        0          55s
+notes-dev-deploy-844c88d6df-x94cn   0/1     ErrImagePull   0          10s
+$ helm history notes-dev
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 19:27:20 2026	superseded	notes-chart-0.1.0	1.0        	Install complete
+2       	Wed Oct  7 19:28:06 2026	superseded	notes-chart-0.1.0	1.0        	Upgrade complete
+3       	Wed Oct  7 19:28:50 2026	deployed  	notes-chart-0.1.0	1.0        	Upgrade complete
+
+----- Rollback -----
+$ helm rollback notes-dev 2
+Rollback was a success! Happy Helming!
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "notes-dev-deploy" rollout to finish: 1 old replicas are pending termination...
+deployment "notes-dev-deploy" successfully rolled out
+$ kubectl get pods | grep notes-dev      # VERIFY: healthy again, 3 pods
+notes-dev-deploy-57c655ccc5-24mz7   1/1     Running       0          58s
+notes-dev-deploy-57c655ccc5-8qf7f   1/1     Running       0          3s
+notes-dev-deploy-57c655ccc5-cxwl4   1/1     Running       0          1s
+notes-dev-deploy-844c88d6df-v9c55   0/1     Terminating   0          3s
+notes-dev-deploy-844c88d6df-x94cn   0/1     Terminating   0          13s
+$ helm history notes-dev
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 19:27:20 2026	superseded	notes-chart-0.1.0	1.0        	Install complete
+2       	Wed Oct  7 19:28:06 2026	superseded	notes-chart-0.1.0	1.0        	Upgrade complete
+3       	Wed Oct  7 19:28:50 2026	superseded	notes-chart-0.1.0	1.0        	Upgrade complete
+4       	Wed Oct  7 19:29:01 2026	deployed  	notes-chart-0.1.0	1.0        	Rollback to 2   
+
+----- helm get manifest -----
+$ helm get manifest notes-dev | head -10
+---
+# Source: notes-chart/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notes-dev-config
+data:
+  APP_NAME: "notes-app"
+  ENVIRONMENT: "production"
+
+
+----- helm repo & search (public chart repos) -----
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+"bitnami" has been added to your repositories
+$ helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "bitnami" chart repository
+Update Complete. ⎈Happy Helming!⎈
+$ helm search repo nginx
+NAME                            	CHART VERSION	APP VERSION	DESCRIPTION                                       
+bitnami/nginx                   	25.2.1       	1.31.6     	NGINX Open Source is a web server that can be a...
+bitnami/nginx-ingress-controller	12.0.7       	1.13.1     	NGINX Ingress Controller is an Ingress controll...
+bitnami/nginx-intel             	2.1.15       	0.4.9      	DEPRECATED NGINX Open Source for Intel is a lig...
+
+----- Cleanup: helm uninstall -----
+$ helm uninstall notes-dev
+release "notes-dev" uninstalled
+$ kubectl get pods,svc,configmap | grep notes-dev      # expect nothing
+(no resources found -- fully cleaned up)
+$ helm list      # expect empty
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
