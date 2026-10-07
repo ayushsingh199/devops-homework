@@ -1,0 +1,162 @@
+name: Python DevSecOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '16-devsecops-pipeline/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '16-devsecops-pipeline/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: 16-devsecops-pipeline
+
+jobs:
+
+  # STEP 1 -- Unit Tests
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: pytest --cov=app --cov-report=term-missing
+
+  # STEP 2 -- SAST (CodeQL)
+  sast:
+    name: SAST - CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - name: Analyze code
+        uses: github/codeql-action/analyze@v3
+
+  # STEP 3 -- SCA (dependency vulnerability scan)
+  sca:
+    name: SCA - Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pip-audit
+      - name: Run dependency scan
+        run: pip-audit
+
+  # STEP 4 -- Secret scanning (gitleaks)
+  secret-scan:
+    name: Secret Scanning - Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_NOTIFY_USER_LIST: ""
+
+  # STEP 5 -- Docker build (only after test/SAST/SCA/secret-scan all pass)
+  docker-build:
+    name: Docker Build
+    needs: [test, sast, sca, secret-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t session17-python:${{ github.sha }} .
+
+  # STEP 6 -- Container image scan (Trivy) -- the security gate
+  image-scan:
+    name: Image Scan - Trivy
+    needs: [docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t session17-python:${{ github.sha }} .
+      - name: Scan image for HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: session17-python:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          format: table
+
+  # STEP 7 -- Push image to GitHub Container Registry
+  push:
+    name: Push Image to GHCR
+    needs: [image-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and tag image
+        run: |
+          docker build \
+            -t ghcr.io/ayushsingh199/devops-homework-session17:${{ github.sha }} \
+            -t ghcr.io/ayushsingh199/devops-homework-session17:latest \
+            .
+      - name: Push image
+        run: |
+          docker push ghcr.io/ayushsingh199/devops-homework-session17:${{ github.sha }}
+          docker push ghcr.io/ayushsingh199/devops-homework-session17:latest
+
+  # STEP 8 -- Deploy to Kubernetes (ephemeral Kind cluster, inside the runner)
+  deploy:
+    name: Deploy to Kubernetes
+    needs: [push]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create k8s Kind cluster
+        uses: helm/kind-action@v1.10.0
+      - name: Update deployment with new image tag
+        run: sed -i "s|__IMAGE_TAG__|${{ github.sha }}|g" k8s/deployment.yaml
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+      - name: Check rollout status
+        run: kubectl rollout status deployment/session17-python --timeout=90s
+      - name: Test the running app
+        run: |
+          kubectl port-forward service/session17-python 5001:80 &
+          sleep 3
+          echo "Fetching the website HTML..."
+          curl -s http://localhost:5001 | head -n 10
+          echo
+          echo "Fetching the API status..."
+          curl -s http://localhost:5001/api/status

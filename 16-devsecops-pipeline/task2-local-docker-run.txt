@@ -1,0 +1,32 @@
+===== Local Docker run verification =====
+$ docker build -t session17-test:local .
+(build succeeded -- see above)
+$ docker run -d -p 15001:5001 session17-test:local
+$ curl -s http://localhost:15001/health
+{
+  "status": "healthy",
+  "timestamp": "2026-10-07T14:08:15.810373Z",
+  "uptime_seconds": 2.56
+}
+
+$ curl -s http://localhost:15001/api/status
+{
+  "app": "DevSecOps Dashboard",
+  "platform": "Linux",
+  "python_version": "3.12.15",
+  "status": "running",
+  "timestamp": "2026-10-07T14:08:15.830009Z",
+  "total_requests": 2,
+  "uptime": "00h 00m 02s",
+  "version": "2.0.0"
+}
+
+$ curl -s -X POST http://localhost:15001/api/calculate -H "Content-Type: application/json" -d "{\"a\":4,\"b\":5,\"operation\":\"multiply\"}"
+{
+  "a": 4.0,
+  "b": 5.0,
+  "expression": "4.0 x 5.0 = 20.0",
+  "operation": "multiply",
+  "result": 20.0,
+  "symbol": "x"
+}
